@@ -936,182 +936,290 @@ void PollSystemInit(void) {
 
 ## 3.4实例Eg4_Mouse
 
-本节我们目标是学习MultiTimer ；
+本节的目标是实现模拟鼠标的功能；
 
-### 3.3.1MultiTimer
+### 3.4.1硬件说明
 
-#### 简介
+摇杆XY模拟鼠标的XY轴，而摇杆自带的按键则作为鼠标中键；
 
-MultiTimer 是一个软件定时器扩展模块，可无限扩展你所需的定时器任务，取代传统的标志位判断方式， 更优雅更便捷地管理程序的时间触发时序。
+另外板载独立按键SW2、SW3、SW4、SW5分别作为鼠标的滚轮上下和鼠标左右键；
 
-#### 使用方法
+### 3.4.2 软件设计
 
-1. 配置系统时间基准接口，安装定时器驱动；
-
-```c
-uint64_t PlatformTicksGetFunc(void)
-{
-    /* Platform implementation */
-}
-
-MultiTimerInstall(PlatformTicksGetFunc);
-```
-
-2. 实例化一个定时器对象；
-
-```c
-MultiTimer timer1;
-```
-
-3. 设置定时时间，超时回调处理函数， 用户上下指针，启动定时器；
-
-```c
-int MultiTimerStart(&timer1, uint64_t timing, MultiTimerCallback_t callback, void* userData);
-```
-
-4. 在主循环调用定时器后台处理函数
-
-```c
-int main(int argc, char *argv[])
-{
-    ...
-    while (1) {
-        ...
-        MultiTimerYield();
-    }
-}
-```
-
-#### 功能限制
-
-1.定时器的时钟频率直接影响定时器的精确度，尽可能采用1ms/5ms/10ms这几个精度较高的tick;
-
-2.定时器的回调函数内不应执行耗时操作，否则可能因占用过长的时间，导致其他定时器无法正常超时；
-
-3.由于定时器的回调函数是在 MultiTimerYield 内执行的，需要注意栈空间的使用不能过大，否则可能会导致栈溢出。
-
-### 3.3.2 软件设计
-
-在这里我们直接上代码：
+在这里我们直接替换报表描述符为鼠标的
 
 ```C
-MultiTimer timer1;
-MultiTimer timer2;
-MultiTimer timer3;
-MultiTimer timer4;
+const uint8_t MouseRepDesc[ ] =
+{
+        0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+        0x09, 0x02,                    // USAGE (Mouse)
+        0xa1, 0x01,                    // COLLECTION (Application)
+        0x09, 0x01,                    //   USAGE (Pointer)
+        0xa1, 0x00,                    //   COLLECTION (Physical)
+        0x05, 0x09,                    //     USAGE_PAGE (Button)
+        0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+        0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
+        0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+        0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x75, 0x01,                    //     REPORT_SIZE (1)
+        0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+        0x95, 0x01,                    //     REPORT_COUNT (1)
+        0x75, 0x05,                    //     REPORT_SIZE (5)
+        0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
+        0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+        0x09, 0x30,                    //     USAGE (X)
+        0x09, 0x31,                    //     USAGE (Y)
+        0x09, 0x38,                    //     USAGE (Wheel)
+        0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
+        0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
+        0x75, 0x08,                    //     REPORT_SIZE (8)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x81, 0x06,                    //     INPUT (Data,Var,Rel)
+        0xc0,                          //   END_COLLECTION
+        0xc0,                          //END_COLLECTION
+};
 
-void SysTick_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+```
 
-// 获取平台时钟计数的函数
-uint64_t PlatformTicksGetFunc(void) {
-    return uwTick;
-}
+这段代码似乎是摇杆数据和按键处理一部分，用于处理来自操纵杆（joystick）的输入数据，并将其通过USB传输。
 
-u8 buttonSemaphore = 0;
-u8 button = 0;
-
-// 按钮定时器回调函数
-void ButtonTimer1Callback(MultiTimer* timer, void *userData) {
-    printf("Button_scan\r\n");
-
-    // 如果按钮信号量为0，扫描按钮状态
-    if (buttonSemaphore == 0) {
-        button = Button_scan();
-        buttonSemaphore = 1;
-    }
-
-    // 启动按钮定时器，每5毫秒触发一次，重新调用此回调函数
-    MultiTimerStart(timer, 5, ButtonTimer1Callback, userData);
-}
-
-u8 adcSemaphore = 0;
-u8 xtemp = 0, ytemp = 0;
-u16 adxsum = 0, adysum = 0, adcount = 0;
-
-// ADC定时器回调函数
-void ADCTimer2Callback(MultiTimer* timer, void *userData) {
-    printf("ADC Sample\r\n");
-
-    // 如果ADC信号量为0，执行ADC采样
-    if (adcSemaphore == 0) {
-        adysum += Get_Adc(1);
-        adxsum += Get_Adc(2);
-        adcount += 1;
-
-        // 当累积10次采样后，计算平均值并进行处理
-        if (++adcount == 10) {
-            printf("x=%d, y=%d\r\n", adysum / adcount, adxsum / adcount);
-            ytemp = map(adysum / adcount, AD_XMIN, AD_XMAX, 0, 255);
-            xtemp = map(adxsum / adcount, AD_YMIN, AD_YMAX, 0, 255);
-            adysum = 0;
-            adxsum = 0;
-            adcount = 0;
-            adcSemaphore = 1;
-        }
-    }
-
-    // 启动ADC定时器，每5毫秒触发一次，重新调用此回调函数
-    MultiTimerStart(timer, 5, ADCTimer2Callback, userData);
-}
-
-u8 Joystick_Report[3] = { 0 };
-u8 LastJoystick_Report[3] = { 0 };
-
-// 摇杆数据定时器回调函数
+```c
 void JoystickTimer3Callback(MultiTimer* timer, void *userData) {
-    printf("Joystick Report\r\n");
+    printf("Joystick Report\r\n");  // 打印"Joystick Report"消息
 
-    // 如果USB设备已枚举，处理摇杆和按钮数据
-    if (USBHD_DevEnumStatus) {
-        if (adcSemaphore) {
-            adcSemaphore = 0;
-            Joystick_Report[1] = ytemp;
-            Joystick_Report[0] = xtemp;
-        }
-        if (buttonSemaphore) {
-            buttonSemaphore = 0;
-            Joystick_Report[2] = button;
-        }
+    memset(Joystick_Report, 0, 4);  // 用0初始化名为Joystick_Report的数组的前4个字节
 
-        // 如果摇杆或按钮数据发生变化，发送数据给USB主机
-        if (memcmp(LastJoystick_Report, Joystick_Report, sizeof(Joystick_Report) / sizeof(Joystick_Report[0])) != 0) {
-            USBHD_Endp_DataUp(DEF_UEP1, Joystick_Report, sizeof(Joystick_Report) / sizeof(Joystick_Report[0]), DEF_UEP_CPY_LOAD);
+    if(USBHD_DevEnumStatus) {
+        if(adcSemaphore) {  // 检查adcSemaphore是否为真
+            adcSemaphore = 0;  // 将adcSemaphore设置为0，可能是一个标志用于控制ADC数据采集
+            if(xtemp > (X_BASE + 20)) {
+                Joystick_Report[1] = ((xtemp - X_BASE) >> DIV) + 1;  // 计算并设置X轴的值
+            }
+            if(xtemp < (X_BASE - 20)) {
+                Joystick_Report[1] = (u8)-(((X_BASE - xtemp) >> DIV) + 1);  // 计算并设置X轴的值（可能是负数）
+            }
+            if(ytemp > (Y_BASE + 20)) {
+                Joystick_Report[2] = ((ytemp - Y_BASE) >> DIV) + 1;  // 计算并设置Y轴的值
+            }
+            if(ytemp < (Y_BASE - 20)) {
+                Joystick_Report[2] = (u8)-(((Y_BASE - ytemp) >> DIV) + 1);  // 计算并设置Y轴的值（可能是负数）
+            }
         }
-
-        // 复制当前的摇杆和按钮数据以供下次比较
-        memcpy(LastJoystick_Report, Joystick_Report, sizeof(Joystick_Report) / sizeof(Joystick_Report[0]));
+        if(buttonSemaphore) {  // 检查buttonSemaphore是否为真
+            buttonSemaphore = 0;  // 将buttonSemaphore设置为0，可能是一个标志用于控制按钮状态
+            Joystick_Report[0] = button;  // 设置按钮状态
+            Joystick_Report[3] = wheel;  // 设置滚轮状态
+        }
+        // 通过USB传输Joystick_Report数据，其中包含了X轴、Y轴、按钮和滚轮的状态
+        USBHD_Endp_DataUp(DEF_UEP1, Joystick_Report, sizeof(Joystick_Report) / sizeof(Joystick_Report[0]), DEF_UEP_CPY_LOAD);
     }
 
-    // 启动摇杆数据定时器，每5毫秒触发一次，重新调用此回调函数
-    MultiTimerStart(timer, 5, JoystickTimer3Callback, userData);
-}
-
-// WS2812B LED控制定时器回调函数
-void WS2812BTimer4Callback(MultiTimer* timer, void *userData) {
-    printf("WS2812B\r\n");
-    ws281x_rainbow();
-
-    // 启动WS2812B LED控制定时器，每100毫秒触发一次，重新调用此回调函数
-    MultiTimerStart(timer, 100, WS2812BTimer4Callback, userData);
-}
-
-// 初始化系统轮询功能
-void PollSystemInit(void) {
-    MultiTimerInstall(PlatformTicksGetFunc);
-
-    // 启动各个定时器，以触发相应的回调函数
-    MultiTimerStart(&timer1, 5, ButtonTimer1Callback, NULL);
-    MultiTimerStart(&timer2, 5, ADCTimer2Callback, NULL);
-    MultiTimerStart(&timer3, 5, JoystickTimer3Callback, NULL);
-    MultiTimerStart(&timer4, 100, WS2812BTimer4Callback, NULL);
+    MultiTimerStart(timer, 5, JoystickTimer3Callback, userData);  // 在5毫秒后再次调用此函数，以实现定时器回调
 }
 
 ```
 
-这段代码主要是嵌入式系统中用于处理按钮、ADC采样、摇杆数据、和WS2812B LED控制的定时器和回调函数的实现。
 
-通过定时器回调函数将各个任务模块化；
 
-### 3.3.3 下载验证
+### 3.4.3 下载验证
 
-我们把固件程序下载进去可以，效果同上一实例，板载WS2812实现了七彩渐变效果；
+我们把固件程序下载进去可以，效果与普通鼠标基本一致；
+
+
+
+
+
+
+
+## 3.5实例Eg5_Keyboard
+
+本节的目标是实现模拟键盘的功能；
+
+### 3.4.1硬件说明
+
+我们将使用SW1作为左shift键，SW2、SW4、SW5、SW3、SW6、SW9、SW8、SW7分别作为1~8按键。 
+
+### 3.4.2 软件设计
+
+在这里我们直接替换报表描述符为键盘的
+
+```C
+const uint8_t KeyBoardRepDesc[ ] =
+{
+        0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+        0x09, 0x06, // USAGE (Keyboard)
+        0xa1, 0x01, // COLLECTION (Application)
+        0x05, 0x07, // USAGE_PAGE (Keyboard)
+        0x19, 0xe0, // USAGE_MINIMUM (Keyboard LeftControl)
+        0x29, 0xe7, // USAGE_MAXIMUM (Keyboard Right GUI)
+        0x15, 0x00, // LOGICAL_MINIMUM (0)
+        0x25, 0x01, // LOGICAL_MAXIMUM (1)
+        0x75, 0x01, // REPORT_SIZE (1)
+        0x95, 0x08, // REPORT_COUNT (8)
+        0x81, 0x02, // INPUT (Data,Var,Abs)
+        0x95, 0x01, // REPORT_COUNT (1)
+        0x75, 0x08, // REPORT_SIZE (8)
+        0x81, 0x03, // INPUT (Cnst,Var,Abs)
+        0x95, 0x05, // REPORT_COUNT (5)
+        0x75, 0x01, // REPORT_SIZE (1)
+        0x05, 0x08, // USAGE_PAGE (LEDs)
+        0x19, 0x01, // USAGE_MINIMUM (Num Lock)
+        0x29, 0x05, // USAGE_MAXIMUM (Kana)
+        0x91, 0x02, // OUTPUT (Data,Var,Abs)
+        0x95, 0x01, // REPORT_COUNT (1)
+        0x75, 0x03, // REPORT_SIZE (3)
+        0x91, 0x03, // OUTPUT (Cnst,Var,Abs)
+        0x95, 0x06, // REPORT_COUNT (6)
+        0x75, 0x08, // REPORT_SIZE (8)
+        0x15, 0x00, // LOGICAL_MINIMUM (0)
+        0x25, 0xFF, // LOGICAL_MAXIMUM (255)
+        0x05, 0x07, // USAGE_PAGE (Keyboard)
+        0x19, 0x00, // USAGE_MINIMUM (Reserved (no event indicated))
+        0x29, 0x65, // USAGE_MAXIMUM (Keyboard Application)
+        0x81, 0x00, // INPUT (Data,Ary,Abs)
+        0xC0        // END_COLLECTION
+};
+
+```
+
+然后按照报告描述符，我们通过捕获键盘数据可以得到如下协议
+
+键盘发送给PC的数据每次8个字节
+BYTE1 BYTE2 BYTE3 BYTE4 BYTE5 BYTE6 BYTE7 BYTE8
+定义分别是：
+BYTE1 --
+    |--bit0:  Left Control是否按下，按下为1 
+    |--bit1:  Left Shift 是否按下，按下为1 
+    |--bit2:  Left Alt  是否按下，按下为1 
+    |--bit3:  Left GUI  是否按下，按下为1 
+    |--bit4:  Right Control是否按下，按下为1 
+    |--bit5:  Right Shift 是否按下，按下为1 
+    |--bit6:  Right Alt  是否按下，按下为1 
+    |--bit7:  Right GUI  是否按下，按下为1 
+BYTE2 -- 保留字节
+BYTE3--BYTE8 -- 这六个为普通按键
+
+根据我们之前定好的SW1作为左shift按键，所以这里BYTE1的bit1位1即为按下，其他是1~8键则依次填充BYTE3~BYTE8；
+
+```c
+void Button_Handle(u8* Buf)
+{
+
+    uint8_t i=2;
+    if(SW1()==Bit_SET)//SHIFT
+    {
+        Buf[0]|=0x02;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }else{
+        Buf[0]&=~0x02;
+    }
+    if(UPKEY()==Bit_RESET)
+    {
+        Buf[i]=CODE1;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+    if(LFKEY()==Bit_RESET)
+    {
+        Buf[i]=CODE2;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+
+    if(RGKEY()==Bit_RESET)
+    {
+        Buf[i]=CODE3;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+
+    if(DNKEY()==Bit_RESET)
+    {
+        Buf[i]=CODE4;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+    if((TBKEY())==Bit_RESET)//2@
+    {
+
+        Buf[i]=CODE5;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+    if((BKKEY())==Bit_RESET)//左CTRL
+    {
+
+        Buf[i]=CODE6;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+    if((MDKEY())==Bit_RESET)//左ALT
+    {
+
+        Buf[i]=CODE7;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+
+    if((STKEY())==Bit_RESET)//I
+    {
+
+        Buf[i]=CODE8;
+        if(++i==8)//切换到下个位置。
+        {
+            i=2;
+        }
+    }
+
+
+}
+
+```
+
+最后是上报报文
+
+```c
+void keyBoardTimer3Callback(MultiTimer* timer, void *userData) {
+
+    u8 keyBoardReport[8] = { 0 };
+    static u8 lastKeyboardReport[8] ={0};
+    printf("Keyboard Report\r\n");
+
+    if( USBHD_DevEnumStatus )
+    {
+        Button_Handle(keyBoardReport);
+
+        if(memcmp(keyBoardReport,lastKeyboardReport,sizeof(keyBoardReport) / sizeof(keyBoardReport[0]))!=0)
+        {
+            USBHD_Endp_DataUp( DEF_UEP1, keyBoardReport,sizeof(keyBoardReport) / sizeof(keyBoardReport[0]), DEF_UEP_CPY_LOAD );
+        }
+
+        memcpy(lastKeyboardReport,keyBoardReport,8);
+    }
+    MultiTimerStart(timer, 5, keyBoardTimer3Callback, userData);
+}
+```
+
+
+
+### 3.4.3 下载验证
+
+我们把固件程序下载进去可以，效果与键盘的shift，12345678基本一致；
