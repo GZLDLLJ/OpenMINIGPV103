@@ -1,3 +1,4 @@
+
 # 序
 
 由于作者水平有限，文档和视频中难免有出错和讲得不好的地方，欢迎各位读者和观众善意地提出意见和建议，谢谢！
@@ -571,27 +572,32 @@ void Get_SerialNum(void)
 WS2812B-V5是一个集控制电路与发光电路于一体的智能外控LED光源。其外型与一个5050LED灯珠相同，每个元件即为一个像素点。像素点内部包含了智能数字接口数据锁存信号整形放大驱动电路，还包含有高精度的内部振荡器和可编程定电流控制部分，有效保证了像素点光的颜色高度一致。数据协议采用单线归零码的通讯方式，像素点在上电复位以后，DIN端接受从控制器传输过来的数据，首先送过来的24bit数据被第一个像素点提取后，送到像素点内部的数据锁存器，剩余的数据经过内部整形处理电路整形放大后通过DO端口开始转发输出给下一个级联的像素点，每经过一个像素点的传输，信号减少24bit。像素点采用自动整形转发技术，使得该像素点的级联个数不受信号传送的限制，仅受限信号传输速度要求。高达2KHz的端口扫描频率，在高清摄像头的捕捉下都不会出现闪烁现象，非常适合高速移动产品的使用。280μs以上的RESET时间，出现中断也不会引起误复位，可以支持更低频率、价格便宜的MCU。LED具有低电压驱动、环保节能、亮度高、散射角度大、一致性好、超低功率及超长寿命等优点。将控制电路集成于LED上面，电路变得更加简单，体积小，安装更加简便。
 
 #### 3.2.1.1 原理图
+![在这里插入图片描述](https://img-blog.csdnimg.cn/f9dc5e1eb77d44a18b81f86d9d25eacc.png#pic_center)
 
-   ![image-20231009230924044](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231009230924044.png)
+
 如上图是WS2812B原理图，
 
 
 
 #### 3.2.1.2 数据传输时间
 
-![image-20231009231448802](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231009231448802.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/013127f8e7524f0c9c7403176acbb75d.png#pic_center)
+
 
 #### 3.2.1.3 时序波形图
 
-![image-20231009231618157](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231009231618157.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/9bbd052725374495ba39420135cac6fa.png#pic_center)
+
 
 #### 3.2.1.4 数据传输方法
 
-![image-20231009231708126](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231009231708126.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/f6b49e387b414376a07754a306863771.png#pic_center)
+
 
 #### 3.2.1.5  24bit 数据结构
 
-![image-20231009231751228](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231009231751228.png)
+![在这里插入图片描述](https://img-blog.csdnimg.cn/5acfe70ffe0a4ded9780317e911d7dcb.png#pic_center)
+
 
 ### 3.2.2 软件设计
 
@@ -982,7 +988,7 @@ const uint8_t MouseRepDesc[ ] =
 
 ```
 
-这段代码似乎是摇杆数据和按键处理一部分，用于处理来自操纵杆（joystick）的输入数据，并将其通过USB传输。
+这段代码是摇杆数据和按键处理一部分，用于处理来自操纵杆（joystick）的输入数据，并将其通过USB传输。
 
 ```c
 void JoystickTimer3Callback(MultiTimer* timer, void *userData) {
@@ -1316,10 +1322,10 @@ void GamepadHandle(void)
 ### 3.6.3 下载验证
 
 我们把固件程序下载进去，可以看到游戏控制器界面有两个控制器，调开属性界面两个都可以控制；
-![image](https://img2022.cnblogs.com/blog/1966993/202210/1966993-20221018221056179-1624529137.png)
+![image](https://img-blog.csdnimg.cn/img_convert/c082deb585ed6e410b3fa2305ad5f3fc.png)
 
 我们可以打开Bus Hound，抓取报文，端点0传输的是枚举过程，然后我们看Device：66.1的4个字节的，报文01 7e 7d 00是Report id为1的报文， 报文02 7e 7d 00是Report id为2的报文，因为我们上报的是相同的数据，就ID不同，故而控制的是两个joystick设备；
-![image](https://img2022.cnblogs.com/blog/1966993/202210/1966993-20221018221123968-1460373926.png)
+![image](https://img-blog.csdnimg.cn/img_convert/45b44e665855b6011ae9e96de4868c7c.png)
 
 
 
@@ -1822,12 +1828,12 @@ int main(void)
 本节目标是实现Gamepad，Gamepad和Joystick是有很大区别的，我们先看一下Joystick，如下图Joystick是带有XY轴并带有若干个按键的HID。
 
 
-![image](https://img2023.cnblogs.com/blog/1966993/202212/1966993-20221228223710523-725267649.png)
+![image](https://img-blog.csdnimg.cn/img_convert/31657996ccf1270a25ed07d7b83bc7e3.png)
 
 
 而Gamepad除了XY轴和按键，还有Z轴，Rx和Ry（旋转），并带有视觉头盔。
 
-![image](https://img2023.cnblogs.com/blog/1966993/202212/1966993-20221228223640742-1235345320.png)
+![image](https://img-blog.csdnimg.cn/img_convert/c9dac232021b22b109666388d4c34180.png)
 
 
 本节的就是实现如上图这样一个Gamepad。
@@ -2018,7 +2024,7 @@ void Gamepad_Handle(void)
 
 我们把固件程序下载进去，界面如下图，摇动摇杆，XY轴响应，按下左边4个按键可控制视觉头盔。板子中间四颗按键实现1~4按钮按下。
 
-![image](https://img2023.cnblogs.com/blog/1966993/202212/1966993-20221228223601164-293653265.png)
+![image](https://img-blog.csdnimg.cn/img_convert/f0c50ac4a369c06ef168db7a7ce9b632.png)
 
 
 
