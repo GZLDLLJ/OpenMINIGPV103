@@ -1232,7 +1232,7 @@ void keyBoardTimer3Callback(MultiTimer* timer, void *userData) {
 
 ## 3.6 实例Eg6_DoubleJoystick
 
-目标是实现一个USB带两个joystick摇杆；功能完全与实例Eg1_GamePad一致；
+目标是实现一个USB带两个joystick摇杆；功能完全与实例Eg1_Joystick一致；
 
 ### 3.6.1硬件设计
 
@@ -1322,7 +1322,7 @@ void GamepadHandle(void)
 ### 3.6.3 下载验证
 
 我们把固件程序下载进去，可以看到游戏控制器界面有两个控制器，调开属性界面两个都可以控制；
-![image](https://img-blog.csdnimg.cn/img_convert/c082deb585ed6e410b3fa2305ad5f3fc.png)
+![image-20231021233605937](C:\Users\Administrator\AppData\Roaming\Typora\typora-user-images\image-20231021233605937.png)
 
 我们可以打开Bus Hound，抓取报文，端点0传输的是枚举过程，然后我们看Device：66.1的4个字节的，报文01 7e 7d 00是Report id为1的报文， 报文02 7e 7d 00是Report id为2的报文，因为我们上报的是相同的数据，就ID不同，故而控制的是两个joystick设备；
 ![image](https://img-blog.csdnimg.cn/img_convert/45b44e665855b6011ae9e96de4868c7c.png)
@@ -1341,476 +1341,127 @@ void GamepadHandle(void)
 
 ### 3.7.2 软件设计
 
-1. 准备Joystick、Mouse和Keyboard三个报表，这三个报表分别是实例Eg1_Joystick、实例Eg4_Mouse与实例Eg5_KeyBoard的报表，
+准备Joystick、Mouse和Keyboard三个报表，这三个报表分别是实例Eg1_Joystick、实例Eg4_Mouse与实例Eg5_KeyBoard的报表，
 
 ```c
-__ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DESC_SIZE] __ALIGN_END =
+/* Joystick Report Descriptor */
+const uint8_t joystickRepDesc[ ] =
 {
-	
-    0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-    0x09, 0x04,                    // USAGE (Joystick)
-    0xa1, 0x01,                    // COLLECTION (Application)
-    0xa1, 0x02,                    //     COLLECTION (Logical)
-    0x09, 0x30,                    //     USAGE (X)
-    0x09, 0x31,                    //     USAGE (Y)
-    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-    0x26, 0xff, 0x00,              //     LOGICAL_MAXIMUM (255)
-    0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
-    0x46, 0xff, 0x00,              //     PHYSICAL_MAXIMUM (255)
-    0x75, 0x08,                    //     REPORT_SIZE (8)
-    0x95, 0x02,                    //     REPORT_COUNT (2)
-    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-    0x05, 0x09,                    //     USAGE_PAGE (Button)
-    0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
-    0x29, 0x08,                    //     USAGE_MAXIMUM (Button 8)
-    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-    0x95, 0x08,                    //     REPORT_COUNT (8)
-    0x75, 0x01,                    //     REPORT_SIZE (1)
-    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-    0xc0,                          //     END_COLLECTION
-	0xc0   						   // END_COLLECTION	
-	
-
+        0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+        0x09, 0x04,                    // USAGE (Joystick)
+        0xa1, 0x01,                    // COLLECTION (Application)
+        0xa1, 0x02,                    //     COLLECTION (Logical)
+        0x09, 0x30,                    //     USAGE (X)
+        0x09, 0x31,                    //     USAGE (Y)
+        0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+        0x26, 0xff, 0x00,              //     LOGICAL_MAXIMUM (255)
+        0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
+        0x46, 0xff, 0x00,              //     PHYSICAL_MAXIMUM (255)
+        0x75, 0x08,                    //     REPORT_SIZE (8)
+        0x95, 0x02,                    //     REPORT_COUNT (2)
+        0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+        0x05, 0x09,                    //     USAGE_PAGE (Button)
+        0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+        0x29, 0x08,                    //     USAGE_MAXIMUM (Button 8)
+        0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+        0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+        0x95, 0x08,                    //     REPORT_COUNT (8)
+        0x75, 0x01,                    //     REPORT_SIZE (1)
+        0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+        0xc0,                          //     END_COLLECTION
+        0xc0                           // END_COLLECTION
 };
-
-/* USER CODE BEGIN PRIVATE_VARIABLES */
-__ALIGN_BEGIN static uint8_t Mouse_ReportDesc_FS[USBD_MOUSE_REPORT_DESC_SIZE] __ALIGN_END =
+/* Mouse Report Descriptor */
+const uint8_t mouseReportDesc[ ] =
 {
-	0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-	0x09, 0x02,                    // USAGE (Mouse)
-	0xa1, 0x01,                    // COLLECTION (Application)
-	0x09, 0x01,                    //   USAGE (Pointer)
-	0xa1, 0x00,                    //   COLLECTION (Physical)
-	0x05, 0x09,                    //     USAGE_PAGE (Button)
-	0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
-	0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
-	0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-	0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-	0x95, 0x03,                    //     REPORT_COUNT (3)
-	0x75, 0x01,                    //     REPORT_SIZE (1)
-	0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-	0x95, 0x01,                    //     REPORT_COUNT (1)
-	0x75, 0x05,                    //     REPORT_SIZE (5)
-	0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
-	0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
-	0x09, 0x30,                    //     USAGE (X)
-	0x09, 0x31,                    //     USAGE (Y)
-	0x09, 0x38,                    //     USAGE (Wheel)
-	0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
-	0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
-	0x75, 0x08,                    //     REPORT_SIZE (8)
-	0x95, 0x03,                    //     REPORT_COUNT (3)
-	0x81, 0x06,                    //     INPUT (Data,Var,Rel)
-	0xc0,                          //   END_COLLECTION
-	0xc0    					   // END_COLLECTION
+        0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+        0x09, 0x02,                    // USAGE (Mouse)
+        0xa1, 0x01,                    // COLLECTION (Application)
+        0x09, 0x01,                    //   USAGE (Pointer)
+        0xa1, 0x00,                    //   COLLECTION (Physical)
+        0x05, 0x09,                    //     USAGE_PAGE (Button)
+        0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+        0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
+        0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+        0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x75, 0x01,                    //     REPORT_SIZE (1)
+        0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+        0x95, 0x01,                    //     REPORT_COUNT (1)
+        0x75, 0x05,                    //     REPORT_SIZE (5)
+        0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
+        0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+        0x09, 0x30,                    //     USAGE (X)
+        0x09, 0x31,                    //     USAGE (Y)
+        0x09, 0x38,                    //     USAGE (Wheel)
+        0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
+        0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
+        0x75, 0x08,                    //     REPORT_SIZE (8)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x81, 0x06,                    //     INPUT (Data,Var,Rel)
+        0xc0,                          //   END_COLLECTION
+        0xc0                           // END_COLLECTION
 };
-
-
-__ALIGN_BEGIN static uint8_t KEY_ReportDesc_FS[USBD_KEY_REPORT_DESC_SIZE] __ALIGN_END =
+/* Keyboard Report Descriptor */
+const uint8_t keyBoardReportDesc[ ] =
 {
-  /* USER CODE BEGIN 0 */
-  0x05, 0x01, // USAGE_PAGE (Generic Desktop)
-  0x09, 0x06, // USAGE (Keyboard)
-  0xa1, 0x01, // COLLECTION (Application)
-  0x05, 0x07, // USAGE_PAGE (Keyboard)
-  0x19, 0xe0, // USAGE_MINIMUM (Keyboard LeftControl)
-  0x29, 0xe7, // USAGE_MAXIMUM (Keyboard Right GUI)
-  0x15, 0x00, // LOGICAL_MINIMUM (0)
-  0x25, 0x01, // LOGICAL_MAXIMUM (1)
-  0x75, 0x01, // REPORT_SIZE (1)
-  0x95, 0x08, // REPORT_COUNT (8)
-  0x81, 0x02, // INPUT (Data,Var,Abs)
-  0x95, 0x01, // REPORT_COUNT (1)
-  0x75, 0x08, // REPORT_SIZE (8)
-  0x81, 0x03, // INPUT (Cnst,Var,Abs)
-  0x95, 0x05, // REPORT_COUNT (5)
-  0x75, 0x01, // REPORT_SIZE (1)
-  0x05, 0x08, // USAGE_PAGE (LEDs)
-  0x19, 0x01, // USAGE_MINIMUM (Num Lock)
-  0x29, 0x05, // USAGE_MAXIMUM (Kana)
-  0x91, 0x02, // OUTPUT (Data,Var,Abs)
-  0x95, 0x01, // REPORT_COUNT (1)
-  0x75, 0x03, // REPORT_SIZE (3)
-  0x91, 0x03, // OUTPUT (Cnst,Var,Abs)
-  0x95, 0x06, // REPORT_COUNT (6)
-  0x75, 0x08, // REPORT_SIZE (8)
-  0x15, 0x00, // LOGICAL_MINIMUM (0)
-  0x25, 0xFF, // LOGICAL_MAXIMUM (255)
-  0x05, 0x07, // USAGE_PAGE (Keyboard)
-  0x19, 0x00, // USAGE_MINIMUM (Reserved (no event indicated))
-  0x29, 0x65, // USAGE_MAXIMUM (Keyboard Application)
-  0x81, 0x00, // INPUT (Data,Ary,Abs)
-  /* USER CODE END 0 */
-  0xC0    /*     END_COLLECTION	             */
+        0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+        0x09, 0x06, // USAGE (Keyboard)
+        0xa1, 0x01, // COLLECTION (Application)
+        0x05, 0x07, // USAGE_PAGE (Keyboard)
+        0x19, 0xe0, // USAGE_MINIMUM (Keyboard LeftControl)
+        0x29, 0xe7, // USAGE_MAXIMUM (Keyboard Right GUI)
+        0x15, 0x00, // LOGICAL_MINIMUM (0)
+        0x25, 0x01, // LOGICAL_MAXIMUM (1)
+        0x75, 0x01, // REPORT_SIZE (1)
+        0x95, 0x08, // REPORT_COUNT (8)
+        0x81, 0x02, // INPUT (Data,Var,Abs)
+        0x95, 0x01, // REPORT_COUNT (1)
+        0x75, 0x08, // REPORT_SIZE (8)
+        0x81, 0x03, // INPUT (Cnst,Var,Abs)
+        0x95, 0x05, // REPORT_COUNT (5)
+        0x75, 0x01, // REPORT_SIZE (1)
+        0x05, 0x08, // USAGE_PAGE (LEDs)
+        0x19, 0x01, // USAGE_MINIMUM (Num Lock)
+        0x29, 0x05, // USAGE_MAXIMUM (Kana)
+        0x91, 0x02, // OUTPUT (Data,Var,Abs)
+        0x95, 0x01, // REPORT_COUNT (1)
+        0x75, 0x03, // REPORT_SIZE (3)
+        0x91, 0x03, // OUTPUT (Cnst,Var,Abs)
+        0x95, 0x06, // REPORT_COUNT (6)
+        0x75, 0x08, // REPORT_SIZE (8)
+        0x15, 0x00, // LOGICAL_MINIMUM (0)
+        0x25, 0xFF, // LOGICAL_MAXIMUM (255)
+        0x05, 0x07, // USAGE_PAGE (Keyboard)
+        0x19, 0x00, // USAGE_MINIMUM (Reserved (no event indicated))
+        0x29, 0x65, // USAGE_MAXIMUM (Keyboard Application)
+        0x81, 0x00, // INPUT (Data,Ary,Abs)
 
+        0xC0    /*     END_COLLECTION              */
 };
 ```
 
-2. 修改USBD_CUSTOM_HID_ItfTypeDef结构体及其实例USBD_CustomHID_fops_FS，可以看到其实这个结构体的前三个成员其实就是指向了以上三个报表描述符。
+在USBHD_Device_Endp_Init需要使能配置端点2,3；
 
 ```c
-typedef struct _USBD_CUSTOM_HID_Itf
+void USBHD_Device_Endp_Init( void )
 {
-	uint8_t                  *jReport;
-	uint8_t                  *mReport;
-    uint8_t                  *kReport;
-    int8_t (* Init)(void);
-    int8_t (* DeInit)(void);
-    int8_t (* OutEvent)(uint8_t event_idx, uint8_t state);
+    /* Initiate endpoint mode settings, please modify them according to your project. */
+    R8_UEP4_1_MOD = RB_UEP1_TX_EN;
+    R8_UEP2_3_MOD = RB_UEP2_TX_EN;
 
-} USBD_CUSTOM_HID_ItfTypeDef;
+    /* Initiate DMA address, please modify them according to your project. */
+    R16_UEP0_DMA = (uint16_t)(uint32_t)USBHD_EP0_Buf;
+    R16_UEP1_DMA = (uint16_t)(uint32_t)USBHD_EP1_Buf;
+    R16_UEP2_DMA = (uint16_t)(uint32_t)USBHD_EP2_Buf;
 
-USBD_CUSTOM_HID_ItfTypeDef USBD_CustomHID_fops_FS =
-{
-  CUSTOM_HID_ReportDesc_FS,
-  Mouse_ReportDesc_FS,
-  KEY_ReportDesc_FS,	
-  CUSTOM_HID_Init_FS,
-  CUSTOM_HID_DeInit_FS,
-  CUSTOM_HID_OutEvent_FS
-};
-```
+    /* End-points initial states */
+    R8_UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
+    R8_UEP1_CTRL = UEP_T_RES_NAK;
+    R8_UEP2_CTRL = UEP_T_RES_NAK;
 
-3.  修改配置描述符集合。增加接口，端点等。
-
-```c
-__ALIGN_BEGIN static uint8_t USBD_CUSTOM_HID_CfgFSDesc[USB_CUSTOM_HID_CONFIG_DESC_SIZ] __ALIGN_END =
-{
-    0x09, /* bLength: Configuration Descriptor size */
-    USB_DESC_TYPE_CONFIGURATION, /* bDescriptorType: Configuration */
-    USB_CUSTOM_HID_CONFIG_DESC_SIZ,
-    /* wTotalLength: Bytes returned */
-    0x00,
-    0x03,         /*bNumInterfaces: 1 interface*/
-    0x01,         /*bConfigurationValue: Configuration value*/
-    0x00,         /*iConfiguration: Index of string descriptor describing the configuration*/
-    0x80,         /*bmAttributes: bus powered */
-    0x32,         /*MaxPower 100 mA: this current is used for detecting Vbus*/
-
-    //----------- Descriptor of Joystick interface ---------------------//
-    /* 09 */
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x00,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x01,         /*bNumEndpoints*/
-    0x03,         /*bInterfaceClass: CUSTOM_HID*/
-    0x00,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x00,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0,            /*iInterface: Index of string descriptor*/
-    //-----------HID Descriptor of Joystick  ---------------------//
-    /* 18 */
-    0x09,         /*bLength: CUSTOM_HID Descriptor size*/
-    CUSTOM_HID_DESCRIPTOR_TYPE, /*bDescriptorType: CUSTOM_HID*/
-    0x11,         /*bCUSTOM_HIDUSTOM_HID: CUSTOM_HID Class Spec release number*/
-    0x01,
-    0x00,         /*bCountryCode: Hardware target country*/
-    0x01,         /*bNumDescriptors: Number of CUSTOM_HID class descriptors to follow*/
-    0x22,         /*bDescriptorType*/
-    USBD_CUSTOM_HID_REPORT_DESC_SIZE,/*wItemLength: Total length of Report descriptor*/
-    0x00,
-    //----------- Descriptor of Joystick endpoints ---------------------//
-    /* 27 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
-
-    CUSTOM_HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    CUSTOM_HID_EPIN_SIZE, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    CUSTOM_HID_FS_BINTERVAL,          /*bInterval: Polling Interval */
-    /* 34 */
-
-    //-----------  Descriptor of Mouse interface    ---------------------//
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x01,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x01,         /*bNumEndpoints*/
-    0x03,         /*bInterfaceClass: CUSTOM_HID*/
-    0x01,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x02,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0,            /*iInterface: Index of string descriptor*/
-    //-----------   Descriptor of Mouse CUSTOM_HID    ---------------------//
-    /* 43 */
-    0x09,         /*bLength: CUSTOM_HID Descriptor size*/
-    CUSTOM_HID_DESCRIPTOR_TYPE, /*bDescriptorType: CUSTOM_HID*/
-    0x11,         /*bCUSTOM_HIDUSTOM_HID: CUSTOM_HID Class Spec release number*/
-    0x01,
-    0x00,         /*bCountryCode: Hardware target country*/
-    0x01,         /*bNumDescriptors: Number of CUSTOM_HID class descriptors to follow*/
-    0x22,         /*bDescriptorType*/
-    USBD_MOUSE_REPORT_DESC_SIZE,/*wItemLength: Total length of Report descriptor*/
-    0x00,
-    //-----------    Descriptor of Mouse endpoints    ---------------------//
-    /* 52 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
-
-    MOUSE_HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    MOUSE_HID_EPIN_SIZE, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    CUSTOM_HID_FS_BINTERVAL,          /*bInterval: Polling Interval */
-    /* 59 */
-    //-----------  Descriptor of KeyBoard interface    ---------------------//
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x02,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x01,         /*bNumEndpoints*/
-    0x03,         /*bInterfaceClass: CUSTOM_HID*/
-    0x00,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x00,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0,            /*iInterface: Index of string descriptor*/
-    //-----------   Descriptor of KeyBoard CUSTOM_HID    ---------------------//
-    /* 68 */
-    0x09,         /*bLength: CUSTOM_HID Descriptor size*/
-    CUSTOM_HID_DESCRIPTOR_TYPE, /*bDescriptorType: CUSTOM_HID*/
-    0x11,         /*bCUSTOM_HIDUSTOM_HID: CUSTOM_HID Class Spec release number*/
-    0x01,
-    0x00,         /*bCountryCode: Hardware target country*/
-    0x01,         /*bNumDescriptors: Number of CUSTOM_HID class descriptors to follow*/
-    0x22,         /*bDescriptorType*/
-    USBD_KEY_REPORT_DESC_SIZE,/*wItemLength: Total length of Report descriptor*/
-    0x00,
-    //-----------    Descriptor of KeyBoard endpoints    ---------------------//
-    /* 77 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
-
-    KEY_HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    KEY_HID_EPIN_SIZE, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    CUSTOM_HID_FS_BINTERVAL,          /*bInterval: Polling Interval */
-    /* 84 */
-};
-```
-
-   
-
-4. 在usbd_conf.h修改最大接口数量为3（这一步非常关键）
-
-```
-#define USBD_MAX_NUM_INTERFACES     3
-```
-
-
-
-5. 根据接口索引修改获取描述符的请求:
-   定位到USBD_CUSTOM_HID->USBD_CUSTOM_HID_Setup在USB_REQ_GET_DESCRIPTOR请求中通过req->wIndex增加报告描述符的请求；
-
-```c
-static uint8_t  USBD_CUSTOM_HID_Setup(USBD_HandleTypeDef *pdev,
-                                      USBD_SetupReqTypedef *req)
-{
-  USBD_CUSTOM_HID_HandleTypeDef *hhid = (USBD_CUSTOM_HID_HandleTypeDef *)pdev->pClassData;
-  uint16_t len = 0U;
-  uint8_t  *pbuf = NULL;
-  uint16_t status_info = 0U;
-  uint8_t ret = USBD_OK;
-  switch (req->bmRequest & USB_REQ_TYPE_MASK)
-  { 
-    case USB_REQ_TYPE_STANDARD:
-      switch (req->bRequest)
-      {
-        case USB_REQ_GET_DESCRIPTOR:
-          if (req->wValue >> 8 == CUSTOM_HID_REPORT_DESC)
-          {			  
-			  if (req->wIndex == 0)
-			  {
-				len = MIN(USBD_CUSTOM_HID_REPORT_DESC_SIZE, req->wLength);
-				pbuf = ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData)->jReport;				  
-			  }else if (req->wIndex == 1){//mouse
-				len = MIN(USBD_MOUSE_REPORT_DESC_SIZE, req->wLength);
-				pbuf = ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData)->mReport;	
-			  
-			  }else if (req->wIndex == 2){//
-				len = MIN(USBD_KEY_REPORT_DESC_SIZE, req->wLength);
-				pbuf = ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData)->kReport;				  
-			  }				  			  		  
-          }
-          else
-          {
-            if (req->wValue >> 8 == CUSTOM_HID_DESCRIPTOR_TYPE)
-            {								
-              pbuf = USBD_CUSTOM_HID_Desc;
-              len = MIN(USB_CUSTOM_HID_DESC_SIZ, req->wLength);
-            }
-          }
-          USBD_CtlSendData(pdev, pbuf, len);
-          break;
-  }
-  return ret;
+    USBHD_Endp_Busy[ DEF_UEP1] = 0;
 }
-```
-
-6. 为端点增加PAM：
-   定位到MX_USB_DEVICE_Init->USBD_Init->USBD_LL_Init；在USBD_LL_Init函数中找到HAL_PCDEx_PMAConfig，通过该接口为EP（端点）配置PMA（Packet Buffer Memory Area ，即USB硬件缓冲区））
-
-```c
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x00 , PCD_SNG_BUF, 0x40);
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x80 , PCD_SNG_BUF, 0x80);
-
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , CUSTOM_HID_EPIN_ADDR , PCD_SNG_BUF, 0xC0);
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , CUSTOM_HID_EPOUT_ADDR , PCD_SNG_BUF, 0x100);
-  
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , MOUSE_HID_EPIN_ADDR , PCD_SNG_BUF, 0x140);
-  HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , KEY_HID_EPIN_ADDR , PCD_SNG_BUF, 0x180); 
-```
-
-7. 打开和配置端点:
-   定位到USBD_CUSTOM_HID->USBD_CUSTOM_HID_Init通过USBD_LL_OpenEP函数中和pdev->ep_in[EP_ADDR & 0xFU].is_used = 1U;打开并使能端点，同时将USBD_LL_PrepareReceive中第四个参数改为大（如果用到接收端点）；
-
-```c
-static uint8_t  USBD_CUSTOM_HID_Init(USBD_HandleTypeDef *pdev,uint8_t cfgidx)
-{
-  uint8_t ret = 0U;
-  USBD_CUSTOM_HID_HandleTypeDef     *hhid;
-  /* Open EP IN */
-  USBD_LL_OpenEP(pdev, CUSTOM_HID_EPIN_ADDR, USBD_EP_TYPE_INTR,CUSTOM_HID_EPIN_SIZE);
-  pdev->ep_in[CUSTOM_HID_EPIN_ADDR & 0xFU].is_used = 1U;
-  /* Open EP OUT */
-  USBD_LL_OpenEP(pdev, CUSTOM_HID_EPOUT_ADDR, USBD_EP_TYPE_INTR,CUSTOM_HID_EPOUT_SIZE);
-  pdev->ep_out[CUSTOM_HID_EPOUT_ADDR & 0xFU].is_used = 1U;				 
-  /* Open MOUSE EP IN */
-  USBD_LL_OpenEP(pdev, MOUSE_HID_EPIN_ADDR, USBD_EP_TYPE_INTR,MOUSE_HID_EPIN_SIZE);
-  pdev->ep_in[MOUSE_HID_EPIN_ADDR & 0xFU].is_used = 1U;	
-  /* Open KEY EP IN */
-  USBD_LL_OpenEP(pdev, KEY_HID_EPIN_ADDR, USBD_EP_TYPE_INTR,KEY_HID_EPIN_SIZE);
-  pdev->ep_in[KEY_HID_EPIN_ADDR & 0xFU].is_used = 1U;	
-  pdev->pClassData = USBD_malloc(sizeof(USBD_CUSTOM_HID_HandleTypeDef));
-  if (pdev->pClassData == NULL)
-  {
-    ret = 1U;
-  }
-  else
-  {
-    hhid = (USBD_CUSTOM_HID_HandleTypeDef *) pdev->pClassData;
-
-    hhid->state = CUSTOM_HID_IDLE;
-    ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData)->Init();
-
-    /* Prepare Out endpoint to receive 1st packet */
-    USBD_LL_PrepareReceive(pdev, CUSTOM_HID_EPOUT_ADDR, hhid->Report_buf,
-                           USBD_CUSTOMHID_OUTREPORT_BUF_SIZE);
-  }
-  return ret;
-}
-```
-
-8. 设置USB设备发生复位则实现端点关闭，释放内存。
-
-```c
-static uint8_t  USBD_CUSTOM_HID_DeInit(USBD_HandleTypeDef *pdev,
-                                       uint8_t cfgidx)
-{
-  /* Close CUSTOM_HID EP IN */
-  USBD_LL_CloseEP(pdev, CUSTOM_HID_EPIN_ADDR);
-  pdev->ep_in[CUSTOM_HID_EPIN_ADDR & 0xFU].is_used = 0U;
-
-  /* Close CUSTOM_HID EP OUT */
-  USBD_LL_CloseEP(pdev, CUSTOM_HID_EPOUT_ADDR);
-  pdev->ep_out[CUSTOM_HID_EPOUT_ADDR & 0xFU].is_used = 0U;
-
-  /* Close MOUSE_HID EP IN */
-  USBD_LL_CloseEP(pdev, MOUSE_HID_EPIN_ADDR);
-  pdev->ep_in[MOUSE_HID_EPIN_ADDR & 0xFU].is_used = 0U;	
-	
-  /* Close JOYSTICK_HID EP IN */
-  USBD_LL_CloseEP(pdev, KEY_HID_EPIN_ADDR);
-  pdev->ep_in[KEY_HID_EPIN_ADDR & 0xFU].is_used = 0U;		
-
-  /* FRee allocated memory */
-  if (pdev->pClassData != NULL)
-  {
-    ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData)->DeInit();
-    USBD_free(pdev->pClassData);
-    pdev->pClassData = NULL;
-  }
-  return USBD_OK;
-}
-```
-
-至此，插上USB已经可以枚举成三个组合的HID了。
-
-```c
-MultiTimer timer1;
-MultiTimer timer2;
-MultiTimer timer3;
-void SystemClock_Config(void);
-typedef enum
-{
-	DEVICE_JOYSTICK=0,
-	DEVICE_MOUSE,
-	DEVICE_KEYBOARD
-}DEVICE_TypeDef;
-DEVICE_TypeDef myHid=DEVICE_JOYSTICK;
-void RportTimer1Callback(MultiTimer* timer, void *userData)
-{
-	if(myHid==DEVICE_JOYSTICK)
-	{
-		Joystick_Handle();
-	}else if(myHid==DEVICE_MOUSE){
-		Mouse_Handle();		
-	}else if(myHid==DEVICE_KEYBOARD){
-		Key_Board_Handle();
-	}    
-    MultiTimerStart(timer, 10, RportTimer1Callback, userData);
-}
-void WS2812BTimer2Callback(MultiTimer* timer, void *userData)
-{
-	if(myHid==DEVICE_JOYSTICK)
-	{
-		WS_WriteAll_RGB(0xFF,0x00,0x00);
-	}else if(myHid==DEVICE_MOUSE){
-		WS_WriteAll_RGB(0x00,0xFF,0x00);		
-	}else if(myHid==DEVICE_KEYBOARD){
-		WS_WriteAll_RGB(0x00,0x00,0xFF);
-	}	
-    MultiTimerStart(timer, 100, WS2812BTimer2Callback, userData);
-}
-void DeviceSwitchTimer3Callback(MultiTimer* timer, void *userData)
-{
-	static u16 swtick=0;
-	if((UPKEY)==0)
-	{
-		if(swtick++>300)
-		{
-			swtick=0;
-			if(++myHid>DEVICE_KEYBOARD)
-			{
-				myHid=DEVICE_JOYSTICK;
-			}		
-		}
-	}else{
-		swtick=0;
-	}   
-    MultiTimerStart(timer, 10, DeviceSwitchTimer3Callback, userData);
-}
-int main(void)
-{
-    HAL_Init();
-    SystemClock_Config();
-    MultiTimerInstall(PlatformTicksGetFunc);
-    MX_GPIO_Init();
-    MX_DMA_Init();
-    MX_ADC1_Init();
-    MX_USB_DEVICE_Init();
-    MX_USART1_UART_Init();
-    MX_TIM3_Init();
-    Gp_ADC_Start_DMA();
-    MultiTimerStart(&timer1, 5, RportTimer1Callback, NULL);
-    MultiTimerStart(&timer2, 10, WS2812BTimer2Callback, NULL);
-	MultiTimerStart(&timer3, 10, DeviceSwitchTimer3Callback, NULL);
-    while (1)
-    {
-        MultiTimerYield();
-    }
-}
-
 ```
 
 
@@ -1847,8 +1498,6 @@ int main(void)
 1. 准备Gamepad报表，根据报表定义，buf[0]和buf[1]分别是XY轴，buf[2]和buf[3]分别是Rx和Ry，而buf[4]代表着Z轴，而按钮是有10个所以占用了1~10bit；而视觉头盔是HatSwitch，4bit；另有2bit是无定义的，而报表还有2BYTE是保留字节。这样算下来一共定义了9个byte。
 
 ```c
-__ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DESC_SIZE] __ALIGN_END =
-{
         0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
         0x09, 0x05,                    // USAGE (Game Pad)
         0xa1, 0x01,                    // COLLECTION (Application)
@@ -1856,9 +1505,9 @@ __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DES
         0x09, 0x30,                    //     USAGE (X)
         0x09, 0x31,                    //     USAGE (Y)
         0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-        0x26, 0xff, 0x00,              //     LOGICAL_MAXIMUM (255)
+        0x26, 0xff, 0x00,                    //     LOGICAL_MAXIMUM (255)
         0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
-        0x46, 0xff, 0x00,              //     PHYSICAL_MAXIMUM (255)
+        0x46, 0xff, 0x00,                    //     PHYSICAL_MAXIMUM (255)
         0x95, 0x02,                    //     REPORT_COUNT (2)
         0x75, 0x08,                    //     REPORT_SIZE (8)
         0x81, 0x02,                    //     INPUT (Data,Var,Abs)
@@ -1867,9 +1516,9 @@ __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DES
         0x09, 0x33,                    //     USAGE (Rx)
         0x09, 0x34,                    //     USAGE (Ry)
         0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-        0x26, 0xff, 0x00,              //     LOGICAL_MAXIMUM (255)
+        0x26, 0xff, 0x00,                    //     LOGICAL_MAXIMUM (255)
         0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
-        0x46, 0xff, 0x00,              //     PHYSICAL_MAXIMUM (255)
+        0x46, 0xff, 0x00,                    //     PHYSICAL_MAXIMUM (255)
         0x95, 0x02,                    //     REPORT_COUNT (2)
         0x75, 0x08,                    //     REPORT_SIZE (8)
         0x81, 0x02,                    //     INPUT (Data,Var,Abs)
@@ -1877,9 +1526,9 @@ __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DES
         0xa1, 0x00,                    //   COLLECTION (Physical)
         0x09, 0x32,                    //     USAGE (Z)
         0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-        0x26, 0xff, 0x00,              //     LOGICAL_MAXIMUM (255)
+        0x26, 0xff, 0x00,                    //     LOGICAL_MAXIMUM (255)
         0x35, 0x00,                    //     PHYSICAL_MINIMUM (0)
-        0x46, 0xff, 0x00,              //     PHYSICAL_MAXIMUM (255)
+        0x46, 0xff, 0x00,                    //     PHYSICAL_MAXIMUM (255)
         0x95, 0x01,                    //     REPORT_COUNT (1)
         0x75, 0x08,                    //     REPORT_SIZE (8)
         0x81, 0x02,                    //     INPUT (Data,Var,Abs)
@@ -1896,7 +1545,7 @@ __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DES
         0x25, 0x08,                    //   LOGICAL_MAXIMUM (8)
         0x35, 0x00,                    //   PHYSICAL_MINIMUM (0)
         0x46, 0x3b, 0x10,              //   PHYSICAL_MAXIMUM (4155)
-        0x66, 0x0e, 0x00,              //   UNIT (None)
+        0x66, 0x0e, 0x00,                    //   UNIT (None)
         0x75, 0x04,                    //   REPORT_SIZE (4)
         0x95, 0x01,                    //   REPORT_COUNT (1)
         0x81, 0x42,                    //   INPUT (Data,Var,Abs,Null)
@@ -1905,118 +1554,105 @@ __ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DES
         0x81, 0x03,                    //   INPUT (Cnst,Var,Abs)
         0x75, 0x08,                    //   REPORT_SIZE (8)
         0x95, 0x02,                    //   REPORT_COUNT (2)
-        0x81, 0x03,                    //   INPUT (Cnst,Var,Abs)
-        0xC0    					   // END_COLLECTION 
-};
+        0x81, 0x03,                     //   INPUT (Cnst,Var,Abs)
+
+      0xC0    /*     END_COLLECTION              */    
 ```
 
-2. 我们在Eg5_KeyBoard这个实例基础上修改一下报表描述符即可，然后，我们需要对硬件摇杆和按键进行映射，主要映射XY轴，以及视觉头盔，并且映射button1~4。如下：
+2. 我们只需要修改一下报表描述符即可，然后，我们需要对硬件摇杆和按键进行映射，主要映射XY轴，以及视觉头盔，并且映射button1~4。如下：
 
 ```c
-void Gamepad_Handle(void)
+void buttonHandler(u8* Hat,u8* But)
 {
-    uint8_t Buf[9]={128,128,128,128,128,0,0,0,0};
-    static uint8_t lastBuf[9]={0,0,0,0,0,0,0,0};
-
-	//X-Y
-    for(u8 i=0; i<AD_DATA_SIZE;)
-	{
-		AdXSum += AD_DATA[i];
-		i++;
-		AdYSum += AD_DATA[i];
-		i++;
-	}
-	Xtemp=AdXSum/10;
-	AdXSum=0;
-	Ytemp=AdYSum/10;
-	AdYSum=0;
-	if(Xtemp>Xmax)
-		Xtemp=Xmax;
-	if(Xtemp<Xmin)
-		Xtemp=Xmin;
-
-	if(Ytemp>Ymax)
-		Ytemp=Ymax;
-	if(Ytemp<Ymin)
-		Ytemp=Ymin;		
-
-
-    Buf[1]=(uint8_t)map( Xtemp, Xmin, Xmax, 0, UINT8_MAX );
-    Buf[0]=(uint8_t)map( Ytemp, Ymin, Ymax, 0, UINT8_MAX );
- 
     //Hat
-    if((UPKEY==0)&&(DNKEY==0)&&(LFKEY==0)&&(RGKEY!=0)) //0001
+    if((UPKEY()==0)&&(DNKEY()==0)&&(LFKEY()==0)&&(RGKEY()!=0)) //0001
     {
-        Buf[6]|=HATSW7;
-    }else if((UPKEY==0)&&(DNKEY==0)&&(LFKEY!=0)&&(RGKEY==0))//0010
+        Hat[0]|=HATSW7;
+    }else if((UPKEY()==0)&&(DNKEY()==0)&&(LFKEY()!=0)&&(RGKEY()==0))//0010
     {
-        Buf[6]|=HATSW3;
-    }else if((UPKEY==0)&&(DNKEY!=0)&&(LFKEY==0)&&(RGKEY==0))//0100
+        Hat[0]|=HATSW3;
+    }else if((UPKEY()==0)&&(DNKEY()!=0)&&(LFKEY()==0)&&(RGKEY()==0))//0100
     {
-        Buf[6]|=HATSW1;
-    }else if((UPKEY==0)&&(DNKEY!=0)&&(LFKEY==0)&&(RGKEY!=0))//0101
+        Hat[0]|=HATSW1;
+    }else if((UPKEY()==0)&&(DNKEY()!=0)&&(LFKEY()==0)&&(RGKEY()!=0))//0101
     {
-        Buf[6]|=HATSW8;
-    }else if((UPKEY==0)&&(DNKEY!=0)&&(LFKEY!=0)&&(RGKEY==0))//0110
+        Hat[0]|=HATSW8;
+    }else if((UPKEY()==0)&&(DNKEY()!=0)&&(LFKEY()!=0)&&(RGKEY()==0))//0110
     {
-        Buf[6]|=HATSW2;
-    }else if((UPKEY==0)&&(DNKEY!=0)&&(LFKEY!=0)&&(RGKEY!=0))//0111
+        Hat[0]|=HATSW2;
+    }else if((UPKEY()==0)&&(DNKEY()!=0)&&(LFKEY()!=0)&&(RGKEY()!=0))//0111
     {
-        Buf[6]|=HATSW1;
-    }else if((UPKEY!=0)&&(DNKEY==0)&&(LFKEY==0)&&(RGKEY==0))//1000
+        Hat[0]|=HATSW1;
+    }else if((UPKEY()!=0)&&(DNKEY()==0)&&(LFKEY()==0)&&(RGKEY()==0))//1000
     {
-        Buf[6]|=HATSW5;
-    }else if((UPKEY!=0)&&(DNKEY==0)&&(LFKEY==0)&&(RGKEY!=0))//1001
+        Hat[0]|=HATSW5;
+    }else if((UPKEY()!=0)&&(DNKEY()==0)&&(LFKEY()==0)&&(RGKEY()!=0))//1001
     {
-        Buf[6]|=HATSW6;
-    }else if((UPKEY!=0)&&(DNKEY==0)&&(LFKEY!=0)&&(RGKEY==0))//1010
+        Hat[0]|=HATSW6;
+    }else if((UPKEY()!=0)&&(DNKEY()==0)&&(LFKEY()!=0)&&(RGKEY()==0))//1010
     {
-        Buf[6]|=HATSW4;
-    }else if((UPKEY!=0)&&(DNKEY==0)&&(LFKEY!=0)&&(RGKEY!=0))//1011
+        Hat[0]|=HATSW4;
+    }else if((UPKEY()!=0)&&(DNKEY()==0)&&(LFKEY()!=0)&&(RGKEY()!=0))//1011
     {
-        Buf[6]|=HATSW5;
-    }else if((UPKEY!=0)&&(DNKEY!=0)&&(LFKEY==0)&&(RGKEY!=0))//1101
+        Hat[0]|=HATSW5;
+    }else if((UPKEY()!=0)&&(DNKEY()!=0)&&(LFKEY()==0)&&(RGKEY()!=0))//1101
     {
-        Buf[6]|=HATSW7;
-    }else if((UPKEY!=0)&&(DNKEY!=0)&&(LFKEY!=0)&&(RGKEY==0))//1110
+        Hat[0]|=HATSW7;
+    }else if((UPKEY()!=0)&&(DNKEY()!=0)&&(LFKEY()!=0)&&(RGKEY()==0))//1110
     {
-        Buf[6]|=HATSW3;
+        Hat[0]|=HATSW3;
     }else{
-        Buf[6]&=(~0x3C);
-    }	
-	//Button
-	 if((STKEY)==0)
-    {
-        Buf[5]|=BIT0;
-    }else{
-		Buf[5]&=(~BIT0);
-	}
-    if((MDKEY)==0)
-    {
-        Buf[5]|=BIT1;
-    }else{
-		Buf[5]&=(~BIT1);
-	}
-    if((BKKEY)==0)
-    {
-        Buf[5]|=BIT2;
-    }else{
-		Buf[5]&=(~BIT2);
-	}
-    if((TBKEY)==0)
-    {
-        Buf[5]|=BIT3;
-    }else{
-		Buf[5]&=(~BIT3);
-	}
-
-    if(memcmp(Buf,lastBuf,9)!=0)
-    {
-       USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS,(u8*)&Buf, 9);
+        Hat[0]&=(~0x3C);
     }
+    //Button
+     if(STKEY()==0)
+    {
+        But[0]|=BIT0;
+    }else{
+        But[0]&=(~BIT0);
+    }
+    if(MDKEY()==0)
+    {
+        But[0]|=BIT1;
+    }else{
+        But[0]&=(~BIT1);
+    }
+    if(BKKEY()==0)
+    {
+        But[0]|=BIT2;
+    }else{
+        But[0]&=(~BIT2);
+    }
+    if(TBKEY()==0)
+    {
+        But[0]|=BIT3;
+    }else{
+        But[0]&=(~BIT3);
+    }
+}
 
-    memcpy(lastBuf,Buf,9);
+void ADCTimer2Callback(MultiTimer* timer, void *userData) {
+    printf("ADC Sample\r\n");
 
+    if (adcSemaphore == 0) {
+
+        adysum+=Get_Adc(1);
+        adxsum+=Get_Adc(2);
+
+        if(++adcount==10)
+        {
+            printf("x=%d,y=%d\r\n",adysum/adcount,adxsum/adcount);
+            ytemp = map(adysum/adcount, AD_XMIN, AD_XMAX, 0, 255);
+            xtemp = map(adxsum/adcount, AD_YMIN, AD_YMAX, 0, 255);
+            adysum=0;
+            adxsum=0;
+            adcount=0;
+            adcSemaphore = 1;
+        }
+
+
+    }
+    MultiTimerStart(timer, 5, ADCTimer2Callback, userData);
 }
 ```
 
@@ -2041,43 +1677,44 @@ void Gamepad_Handle(void)
 1. 准备绝对值鼠标报表，
 
 ```c
-__ALIGN_BEGIN static uint8_t CUSTOM_HID_ReportDesc_FS[USBD_CUSTOM_HID_REPORT_DESC_SIZE] __ALIGN_END =
+const uint8_t JoystickRepDesc[ ] =
 {
-		0x05, 0x01,		  // USAGE_PAGE (Generic Desktop)
-		0x09, 0x02,		  // USAGE (Mouse)
-		0xa1, 0x01,		  // COLLECTION (Application)
-		0x09, 0x01,		  //   USAGE (Pointer)
-		0xa1, 0x00,		  //   COLLECTION (Physical)
-		0x05, 0x09,		  //     USAGE_PAGE (Button)
-		0x19, 0x01,		  //     USAGE_MINIMUM (Button 1)
-		0x29, 0x03,		  //     USAGE_MAXIMUM (Button 3)
-		0x95, 0x03,		  //     REPORT_COUNT (3)
-		0x75, 0x01,		  //     REPORT_SIZE (1)
-		0x15, 0x00,		  //     LOGICAL_MINIMUM (0)
-		0x25, 0x01,		  //     LOGICAL_MAXIMUM (1)
-		0x81, 0x02,		  //     INPUT (Data,Var,Abs)
-		0x95, 0x01,		  //     REPORT_COUNT (1)
-		0x75, 0x05,		  //     REPORT_SIZE (5)
-		0x81, 0x01,		  //     INPUT (Cnst,Ary,Abs)
-		0x05, 0x01,		  //     USAGE_PAGE (Generic Desktop)
-		0x09, 0x38,		  //     USAGE (Wheel)
-		0x15, 0x81,		  //     LOGICAL_MINIMUM (-127)
-		0x25, 0x7f,		  //     LOGICAL_MAXIMUM (127)
-		0x95, 0x01,		  //     REPORT_COUNT (1)
-		0x75, 0x08,		  //     REPORT_SIZE (8)
-		0x81, 0x06,		  //     INPUT (Cnst,Ary,Abs)
-		0x16, 0x00,0x00, 	//     LOGICAL_MINIMUM (0)
-		0x26, 0x00,0x01,  //     LOGICAL_MAXIMUM (256)
-		0x36, 0x00,0x00,	//     PHYSICAL_MINIMUM (0)
-		0x46, 0x00,0x01, 	//     PHYSICAL_MAXIMUM (256)
-		0x66, 0x00,0x00, //     UNIT (None)
-		0x09, 0x30,		  //     USAGE (X)
-		0x09, 0x31,		  //     USAGE (Y)
-		0x75, 0x10,		  //     REPORT_SIZE (16)
-		0x95, 0x02,		  //     REPORT_COUNT (2)
-		0x81, 0x62,		  //     INPUT (Data,Var,Abs,NPrf,Null)
-		0xc0,			  //     END_COLLECTION
-		0xc0			  // END_COLLECTION
+        0x05, 0x01,       // USAGE_PAGE (Generic Desktop)
+        0x09, 0x02,       // USAGE (Mouse)
+        0xa1, 0x01,       // COLLECTION (Application)
+        0x09, 0x01,       //   USAGE (Pointer)
+        0xa1, 0x00,       //   COLLECTION (Physical)
+        0x05, 0x09,       //     USAGE_PAGE (Button)
+        0x19, 0x01,       //     USAGE_MINIMUM (Button 1)
+        0x29, 0x03,       //     USAGE_MAXIMUM (Button 3)
+        0x95, 0x03,       //     REPORT_COUNT (3)
+        0x75, 0x01,       //     REPORT_SIZE (1)
+        0x15, 0x00,       //     LOGICAL_MINIMUM (0)
+        0x25, 0x01,       //     LOGICAL_MAXIMUM (1)
+        0x81, 0x02,       //     INPUT (Data,Var,Abs)
+        0x95, 0x01,       //     REPORT_COUNT (1)
+        0x75, 0x05,       //     REPORT_SIZE (5)
+        0x81, 0x01,       //     INPUT (Cnst,Ary,Abs)
+
+        0x05, 0x01,       //     USAGE_PAGE (Generic Desktop)
+        0x09, 0x38,       //     USAGE (Wheel)
+        0x15, 0x81,       //     LOGICAL_MINIMUM (-127)
+        0x25, 0x7f,       //     LOGICAL_MAXIMUM (127)
+        0x95, 0x01,       //     REPORT_COUNT (1)
+        0x75, 0x08,       //     REPORT_SIZE (8)
+        0x81, 0x06,       //     INPUT (Cnst,Ary,Abs)
+        0x16, 0x00,0x00,    //     LOGICAL_MINIMUM (0)
+        0x26, 0x00,0x01,  //     LOGICAL_MAXIMUM (256)
+        0x36, 0x00,0x00,    //     PHYSICAL_MINIMUM (0)
+        0x46, 0x00,0x01,    //     PHYSICAL_MAXIMUM (256)
+        0x66, 0x00,0x00, //     UNIT (None)
+        0x09, 0x30,       //     USAGE (X)
+        0x09, 0x31,       //     USAGE (Y)
+        0x75, 0x10,       //     REPORT_SIZE (16)
+        0x95, 0x02,       //     REPORT_COUNT (2)
+        0x81, 0x62,       //     INPUT (Data,Var,Abs,NPrf,Null)
+        0xc0,             //     END_COLLECTION
+        0xc0              // END_COLLECTION                                            // End Collection
 };
 ```
 
@@ -2096,81 +1733,117 @@ typedef struct mouseHID_t
 3. 最后解析数据。
 
 ```c
-void AbsoluteMouse_Handle(void)
+void buttonHandler(int8_t* whl,u8* But)
 {
     static uint16_t c_tick=0;
-    memset(&MouseBuf, 0,sizeof(MouseBuf));
-    //X-Y
-    for(u8 i=0; i<AD_DATA_SIZE;)
-    {
-        AdXSum += AD_DATA[i];
-        i++;
-        AdYSum += AD_DATA[i];
-        i++;
-    }
-    Xtemp=AdXSum/10;
-    AdXSum=0;
-    Ytemp=AdYSum/10;
-    AdYSum=0;
-    if(Xtemp>Xmax)
-        Xtemp=Xmax;
-    if(Xtemp<Xmin)
-        Xtemp=Xmin;
-
-    if(Ytemp>Ymax)
-        Ytemp=Ymax;
-    if(Ytemp<Ymin)
-        Ytemp=Ymin;
-    MouseBuf.y=(uint8_t)map( Xtemp, Xmin, Xmax, 0, 255 );
-    MouseBuf.x=(uint8_t)map( Ytemp, Ymin, Ymax, 0, 255 );
-
     //Button
-    if(LFKEY==0)
+    if(LFKEY()==0)
     {
-        MouseBuf.buttons|=BIT0;
+        But[0]|=BIT0;
     } else {
-        MouseBuf.buttons&=(~BIT0);
+        But[0]&=(~BIT0);
     }
-    if(RGKEY==0)
+    if(RGKEY()==0)
     {
-        MouseBuf.buttons|=BIT1;
+        But[0]|=BIT1;
     } else {
-        MouseBuf.buttons&=(~BIT1);
+        But[0]&=(~BIT1);
     }
-    if(SW1==0)
+    if(SW1()==0)
     {
-        MouseBuf.buttons&=(~BIT2);
+        But[0]&=(~BIT2);
     } else {
-        MouseBuf.buttons|=BIT2;
+        But[0]|=BIT2;
     }
 
-    if((UPKEY)==0)
+    if(UPKEY()==0)
     {
         if(c_tick++>5)
         {
-            MouseBuf.wheel=1;
+            whl[0]=1;
             c_tick=0;
         }
     }
-    if((DNKEY)==0)
+    if(DNKEY()==0)
     {
         if(c_tick++>5)
         {
-            MouseBuf.wheel=-1;
+            whl[0]=-1;
             c_tick=0;
         }
     }
-    if(lastMouse_Buffer.x!=MouseBuf.x||lastMouse_Buffer.y!=MouseBuf.y||
-            lastMouse_Buffer.buttons!=MouseBuf.buttons||MouseBuf.wheel!=0)
-    {
-        USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS,(u8*)&MouseBuf, sizeof(MouseBuf));
+}
+void ButtonTimer1Callback(MultiTimer* timer, void *userData) {
+    printf("Button_scan\r\n");
+    if (buttonSemaphore == 0) {
+        button=0;
+        whl=0;
+        buttonHandler(&whl,&button);
+        buttonSemaphore = 1;
     }
-    lastMouse_Buffer.x=MouseBuf.x;
-    lastMouse_Buffer.y=MouseBuf.y;
-    lastMouse_Buffer.buttons=MouseBuf.buttons;
-    lastMouse_Buffer.wheel=MouseBuf.wheel;
+
+    MultiTimerStart(timer, 5, ButtonTimer1Callback, userData);
+}
+u8 adcSemaphore = 0;
+u8 xtemp = 0, ytemp = 0;
+u16 adxsum=0,adysum=0,adcount=0;
+void ADCTimer2Callback(MultiTimer* timer, void *userData) {
+    printf("ADC Sample\r\n");
+
+    if (adcSemaphore == 0) {
+
+        adysum+=Get_Adc(1);
+        adxsum+=Get_Adc(2);
+
+        if(++adcount==10)
+        {
+            printf("x=%d,y=%d\r\n",adysum/adcount,adxsum/adcount);
+            ytemp = map(adysum/adcount, AD_XMIN, AD_XMAX, 0, 255);
+            xtemp = map(adxsum/adcount, AD_YMIN, AD_YMAX, 0, 255);
+            adysum=0;
+            adxsum=0;
+            adcount=0;
+            adcSemaphore = 1;
+        }
 
 
+    }
+    MultiTimerStart(timer, 5, ADCTimer2Callback, userData);
+}
+
+mouseHID_T MouseBuf;
+mouseHID_T lastMouse_Buffer;
+void JoystickTimer3Callback(MultiTimer* timer, void *userData) {
+
+    printf("Mouse Report\r\n");
+    if( USBHD_DevEnumStatus )
+    {
+        memset(&MouseBuf, 0,sizeof(MouseBuf));
+        if(adcSemaphore)
+        {
+            adcSemaphore=0;
+            MouseBuf.x=xtemp;
+            MouseBuf.y=ytemp;
+        }
+        if(buttonSemaphore)
+        {
+            buttonSemaphore=0;
+            MouseBuf.buttons=button;
+            MouseBuf.wheel=whl;
+        }
+
+        if(lastMouse_Buffer.x!=MouseBuf.x||lastMouse_Buffer.y!=MouseBuf.y||
+                lastMouse_Buffer.buttons!=MouseBuf.buttons||MouseBuf.wheel!=0)
+        {
+            USBHD_Endp_DataUp( DEF_UEP1, (u8*)&MouseBuf,sizeof(MouseBuf), DEF_UEP_CPY_LOAD );
+        }
+        lastMouse_Buffer.x=MouseBuf.x;
+        lastMouse_Buffer.y=MouseBuf.y;
+        lastMouse_Buffer.buttons=MouseBuf.buttons;
+        lastMouse_Buffer.wheel=MouseBuf.wheel;
+
+    }
+    MultiTimerStart(timer, 5, JoystickTimer3Callback, userData);
 }
 ```
 
@@ -2180,7 +1853,7 @@ void AbsoluteMouse_Handle(void)
 
 我们把固件程序下载进去，鼠标居中，按键滚轮基本同相对鼠标，而XY轴则是整个屏幕是作为XY轴的。
 
-https://www.bilibili.com/video/BV1uR4y1D7Uy/?vd_source=2bbde87de845d5220b1d8ba075c12fb0
+
 
 
 
@@ -2199,318 +1872,308 @@ https://www.bilibili.com/video/BV1uR4y1D7Uy/?vd_source=2bbde87de845d5220b1d8ba07
 1. **修改设备描述符**
 
 ```c
-#define USBD_VID     0x045E
-#define USBD_PID_FS     0x028E
+#define DEF_USB_VID                   0x045e
+#define DEF_USB_PID                   0x028e
 
-__ALIGN_BEGIN uint8_t USBD_FS_DeviceDesc[USB_LEN_DEV_DESC] __ALIGN_END =
-
+const uint8_t MyDevDescr[ ] =
 {
-  0x12,                       /*bLength */
-  USB_DESC_TYPE_DEVICE,       /*bDescriptorType*/
-  0x00,                       /*bcdUSB */
-  0x02,
-  0x00,                       /*bDeviceClass*/
-  0x00,                       /*bDeviceSubClass*/
-  0x00,                       /*bDeviceProtocol*/
-  USB_MAX_EP0_SIZE,           /*bMaxPacketSize*/
-  LOBYTE(USBD_VID),           /*idVendor*/
-  HIBYTE(USBD_VID),           /*idVendor*/
-  LOBYTE(USBD_PID_FS),        /*idProduct*/
-  HIBYTE(USBD_PID_FS),        /*idProduct*/
-  0x00,                       /*bcdDevice rel. 2.00*/
-  0x02,
-  USBD_IDX_MFC_STR,           /*Index of manufacturer  string*/
-  USBD_IDX_PRODUCT_STR,       /*Index of product string*/
-  USBD_IDX_SERIAL_STR,        /*Index of serial number string*/
-  USBD_MAX_NUM_CONFIGURATION  /*bNumConfigurations*/
+    0x12,                                                   // bLength
+    0x01,                                                   // bDescriptorType
+    0x00, 0x02,                                             // bcdUSB
+    0x00,                                                   // bDeviceClass
+    0x00,                                                   // bDeviceSubClass
+    0x00,                                                   // bDeviceProtocol
+    DEF_USBD_UEP0_SIZE,                                     // bMaxPacketSize0
+    (uint8_t)DEF_USB_VID, (uint8_t)( DEF_USB_VID >> 8 ),    // idVendor
+    (uint8_t)DEF_USB_PID, (uint8_t)( DEF_USB_PID >> 8 ),    // idProduct
+    0x00, DEF_IC_PRG_VER,                                   // bcdDevice
+    0x01,                                                   // iManufacturer
+    0x02,                                                   // iProduct
+    0x03,                                                   // iSerialNumber
+    0x01,                                                   // bNumConfigurations
 };
 ```
 
 **2.修改配置/接口/HID/端点/厂商描述符：**
 
 ```c
-__ALIGN_BEGIN static uint8_t USBD_CUSTOM_HID_CfgFSDesc[USB_CUSTOM_HID_CONFIG_DESC_SIZ] __ALIGN_END =
+/* Configuration Descriptor Set */
+const uint8_t MyCfgDescr[ ] =
 {
-    /************** Configuration Descriptor 1 Bus Powered, 500 mA ****************/
-    0x09, /* bLength: Configuration Descriptor size */
-    USB_DESC_TYPE_CONFIGURATION, /* bDescriptorType: Configuration */
-    USB_CUSTOM_HID_CONFIG_DESC_SIZ,
-    /* wTotalLength: Bytes returned */
-    0x00,
-    0x04,         /*bNumInterfaces: 1 interface*/
-    0x01,         /*bConfigurationValue: Configuration value*/
-    0x00,         /*iConfiguration: Index of string descriptor describing
-  the configuration*/
-    0xA0,         /*bmAttributes: Bus Powered, Remote Wakeup*/
-    0xFA,         /*MaxPower 500 mA: this current is used for detecting Vbus*/
+        /************** Configuration Descriptor 1 Bus Powered, 500 mA ****************/
+        0x09, /* bLength: Configuration Descriptor size */
+        USB_DESC_TYPE_CONFIGURATION, /* bDescriptorType: Configuration */
+        USB_CUSTOM_HID_CONFIG_DESC_SIZ,
+        /* wTotalLength: Bytes returned */
+        0x00,
+        0x04,         /*bNumInterfaces: 1 interface*/
+        0x01,         /*bConfigurationValue: Configuration value*/
+        0x00,         /*iConfiguration: Index of string descriptor describing
+      the configuration*/
+        0xA0,         /*bmAttributes: Bus Powered, Remote Wakeup*/
+        0xFA,         /*MaxPower 500 mA: this current is used for detecting Vbus*/
 
-    /**************Interface Descriptor 0/0 Vendor-Specific, 2 Endpoints****************/
-    /* 09 */
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x00,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x02,         /*bNumEndpoints*/
-    0xFF,         /*Vendor-Specific*/
-    0x5D,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x01,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0x00,            /*iInterface: Index of string descriptor*/
-    /**************Unrecognized Class-Specific Descriptor***********************/
-    /* 18 */
-    0x11,         /*bLength: CUSTOM_HID Descriptor size*/
-    0x21, /*bDescriptorType: CUSTOM_HID*/
-    0x10,0x01,0x01,0x25,0x81,0x14,0x03,0x03,
-    0x03,0x04,0x13,0x02,0x08,0x03,0x03,
-    /**************Endpoint Descriptor 81 1 In, Interrupt, 4 ms******************/
-    /* 27 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+        /**************Interface Descriptor 0/0 Vendor-Specific, 2 Endpoints****************/
+        /* 09 */
+        0x09,         /*bLength: Interface Descriptor size*/
+        USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
+        0x00,         /*bInterfaceNumber: Number of Interface*/
+        0x00,         /*bAlternateSetting: Alternate setting*/
+        0x02,         /*bNumEndpoints*/
+        0xFF,         /*Vendor-Specific*/
+        0x5D,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
+        0x01,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
+        0x00,            /*iInterface: Index of string descriptor*/
+        /**************Unrecognized Class-Specific Descriptor***********************/
+        /* 18 */
+        0x11,         /*bLength: CUSTOM_HID Descriptor size*/
+        0x21, /*bDescriptorType: CUSTOM_HID*/
+        0x10,0x01,0x01,0x25,0x81,0x14,0x03,0x03,
+        0x03,0x04,0x13,0x02,0x08,0x03,0x03,
+        /**************Endpoint Descriptor 81 1 In, Interrupt, 4 ms******************/
+        /* 27 */
+        0x07,          /*bLength: Endpoint Descriptor size*/
+        USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
 
-    CUSTOM_HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    CUSTOM_HID_EPIN_SIZE, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    CUSTOM_HID_FS_BINTERVAL,          /*bInterval: Polling Interval */
-    /**************Endpoint Descriptor 02 2 Out, Interrupt, 8 ms******************/
-    /* 34 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+        CUSTOM_HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
+        0x03,          /*bmAttributes: Interrupt endpoint*/
+        CUSTOM_HID_EPIN_SIZE, /*wMaxPacketSize: 2 Byte max */
+        0x00,
+        CUSTOM_HID_FS_BINTERVAL,          /*bInterval: Polling Interval */
+        /**************Endpoint Descriptor 02 2 Out, Interrupt, 8 ms******************/
+        /* 34 */
+        0x07,          /*bLength: Endpoint Descriptor size*/
+        USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
 
-    0x02,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    0x20, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    0x08,          /*bInterval: Polling Interval */
+        0x02,     /*bEndpointAddress: Endpoint Address (IN)*/
+        0x03,          /*bmAttributes: Interrupt endpoint*/
+        0x20, /*wMaxPacketSize: 2 Byte max */
+        0x00,
+        0x08,          /*bInterval: Polling Interval */
 
-    /**************Interface Descriptor 1/0 Vendor-Specific, 2 Endpoints****************/
-    /* 09 */
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x01,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x02,         /*bNumEndpoints*/
-    0xFF,         /*Vendor-Specific*/
-    0x5D,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x01,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0x00,            /*iInterface: Index of string descriptor*/
-    /**************Unrecognized Class-Specific Descriptor***********************/
-    /* 18 */
-    0x1B,         /*bLength: CUSTOM_HID Descriptor size*/
-    0x21, /*bDescriptorType: CUSTOM_HID*/
-    0x00,0x01,0x01,0x01,0x83,0x40,0x01,0x04,
-    0x20,0x16,0x85,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x16,0x05,0x00,0x00,0x00,0x00,0x00,
-    0x00,
-    /**************Endpoint Descriptor 81 1 In, Interrupt, 4 ms******************/
-    /* 27 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+        /**************Interface Descriptor 1/0 Vendor-Specific, 2 Endpoints****************/
+        /* 09 */
+        0x09,         /*bLength: Interface Descriptor size*/
+        USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
+        0x01,         /*bInterfaceNumber: Number of Interface*/
+        0x00,         /*bAlternateSetting: Alternate setting*/
+        0x02,         /*bNumEndpoints*/
+        0xFF,         /*Vendor-Specific*/
+        0x5D,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
+        0x01,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
+        0x00,            /*iInterface: Index of string descriptor*/
+        /**************Unrecognized Class-Specific Descriptor***********************/
+        /* 18 */
+        0x1B,         /*bLength: CUSTOM_HID Descriptor size*/
+        0x21, /*bDescriptorType: CUSTOM_HID*/
+        0x00,0x01,0x01,0x01,0x83,0x40,0x01,0x04,
+        0x20,0x16,0x85,0x00,0x00,0x00,0x00,0x00,
+        0x00,0x16,0x05,0x00,0x00,0x00,0x00,0x00,
+        0x00,
+        /**************Endpoint Descriptor 81 1 In, Interrupt, 4 ms******************/
+        /* 27 */
+        0x07,          /*bLength: Endpoint Descriptor size*/
+        USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
 
-    0x83,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    0x20, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    0x02,          /*bInterval: Polling Interval */
-    /**************Endpoint Descriptor 02 2 Out, Interrupt, 8 ms******************/
-    /* 34 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+        0x83,     /*bEndpointAddress: Endpoint Address (IN)*/
+        0x03,          /*bmAttributes: Interrupt endpoint*/
+        0x20, /*wMaxPacketSize: 2 Byte max */
+        0x00,
+        0x02,          /*bInterval: Polling Interval */
+        /**************Endpoint Descriptor 02 2 Out, Interrupt, 8 ms******************/
+        /* 34 */
+        0x07,          /*bLength: Endpoint Descriptor size*/
+        USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
 
-    0x04,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    0x20, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    0x04,          /*bInterval: Polling Interval */
+        0x04,     /*bEndpointAddress: Endpoint Address (IN)*/
+        0x03,          /*bmAttributes: Interrupt endpoint*/
+        0x20, /*wMaxPacketSize: 2 Byte max */
+        0x00,
+        0x04,          /*bInterval: Polling Interval */
 
-    /**************Interface Descriptor 2/0 Vendor-Specific, 2 Endpoints****************/
-    /* 09 */
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x02,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x01,         /*bNumEndpoints*/
-    0xFF,         /*Vendor-Specific*/
-    0x5D,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x02,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0x00,            /*iInterface: Index of string descriptor*/
-    /**************Unrecognized Class-Specific Descriptor***********************/
-    /* 18 */
-    0x09,         /*bLength: CUSTOM_HID Descriptor size*/
-    0x21, /*bDescriptorType: CUSTOM_HID*/
-    0x00,0x01,0x01,0x22,0x86,0x07,0x00,
-    /**************Endpoint Descriptor 81 1 In, Interrupt, 4 ms******************/
-    /* 27 */
-    0x07,          /*bLength: Endpoint Descriptor size*/
-    USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+        /**************Interface Descriptor 2/0 Vendor-Specific, 2 Endpoints****************/
+        /* 09 */
+        0x09,         /*bLength: Interface Descriptor size*/
+        USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
+        0x02,         /*bInterfaceNumber: Number of Interface*/
+        0x00,         /*bAlternateSetting: Alternate setting*/
+        0x01,         /*bNumEndpoints*/
+        0xFF,         /*Vendor-Specific*/
+        0x5D,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
+        0x02,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
+        0x00,            /*iInterface: Index of string descriptor*/
+        /**************Unrecognized Class-Specific Descriptor***********************/
+        /* 18 */
+        0x09,         /*bLength: CUSTOM_HID Descriptor size*/
+        0x21, /*bDescriptorType: CUSTOM_HID*/
+        0x00,0x01,0x01,0x22,0x86,0x07,0x00,
+        /**************Endpoint Descriptor 81 1 In, Interrupt, 4 ms******************/
+        /* 27 */
+        0x07,          /*bLength: Endpoint Descriptor size*/
+        USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
 
-    0x86,     /*bEndpointAddress: Endpoint Address (IN)*/
-    0x03,          /*bmAttributes: Interrupt endpoint*/
-    0x20, /*wMaxPacketSize: 2 Byte max */
-    0x00,
-    0x10,          /*bInterval: Polling Interval */
+        0x86,     /*bEndpointAddress: Endpoint Address (IN)*/
+        0x03,          /*bmAttributes: Interrupt endpoint*/
+        0x20, /*wMaxPacketSize: 2 Byte max */
+        0x00,
+        0x10,          /*bInterval: Polling Interval */
 
-    /**************nterface Descriptor 3/0 Vendor-Specific, 0 Endpoints****************/
-    /* 09 */
-    0x09,         /*bLength: Interface Descriptor size*/
-    USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
-    0x03,         /*bInterfaceNumber: Number of Interface*/
-    0x00,         /*bAlternateSetting: Alternate setting*/
-    0x00,         /*bNumEndpoints*/
-    0xFF,         /*Vendor-Specific*/
-    0xFD,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
-    0x13,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
-    0x04,            /*iInterface: Index of string descriptor*/
-    /**************Unrecognized Class-Specific Descriptor***********************/
-    /* 18 */
-    0x06,         /*bLength: CUSTOM_HID Descriptor size*/
-    0x41, /*bDescriptorType: CUSTOM_HID*/
-    0x00,0x01,0x01,0x03
+        /**************nterface Descriptor 3/0 Vendor-Specific, 0 Endpoints****************/
+        /* 09 */
+        0x09,         /*bLength: Interface Descriptor size*/
+        USB_DESC_TYPE_INTERFACE,/*bDescriptorType: Interface descriptor type*/
+        0x03,         /*bInterfaceNumber: Number of Interface*/
+        0x00,         /*bAlternateSetting: Alternate setting*/
+        0x00,         /*bNumEndpoints*/
+        0xFF,         /*Vendor-Specific*/
+        0xFD,         /*bInterfaceSubClass : 1=BOOT, 0=no boot*/
+        0x13,         /*nInterfaceProtocol : 0=none, 1=keyboard, 2=mouse*/
+        0x04,            /*iInterface: Index of string descriptor*/
+        /**************Unrecognized Class-Specific Descriptor***********************/
+        /* 18 */
+        0x06,         /*bLength: CUSTOM_HID Descriptor size*/
+        0x41, /*bDescriptorType: CUSTOM_HID*/
+        0x00,0x01,0x01,0x03
 };
 
 ```
 
-**3. 添加厂商请求的处理。**
+**3. 解析摇杆电位器和按键数据。**
 
 ```c
-static uint8_t  USBD_CUSTOM_HID_Setup(USBD_HandleTypeDef *pdev,
-                                      USBD_SetupReqTypedef *req)
+void buttonHandler(u8* packet1,u8* packet2)
 {
-  USBD_CUSTOM_HID_HandleTypeDef *hhid = (USBD_CUSTOM_HID_HandleTypeDef *)pdev->pClassData;
-  uint16_t len = 0U;
-  uint8_t  *pbuf = NULL;
-  uint16_t status_info = 0U;
-  uint8_t ret = USBD_OK;
-  switch (req->bmRequest & USB_REQ_TYPE_MASK)
-  {
-    case USB_REQ_TYPE_VENDOR:
-        switch (req->bRequest)
-        {
-        case 0x01:
-        {
-            /* code */
-            if(req->wLength == 0x14)
-            {
-                len  = MIN(0x14, req->wLength);
-                pbuf = vendor_request_content;
-            }
-            else if(req->wLength == 0x08)
-            {
-                len  = MIN(0x8, req->wLength);
-                pbuf = vendor_re2;
-            }
-            else if(req->wLength == 0x04)
-            {
-                len  = MIN(0x04, req->wLength);
-                pbuf = vendor_re2;
-            }
-            break;
-        }
-        default:
-            break;
-        }
-        USBD_CtlSendData(pdev, pbuf, len);
-        break;
-    default:
-      USBD_CtlError(pdev, req);
-      ret = USBD_FAIL;
-      break;
-  }
-  return ret;
+
+    //Button
+    if(UPKEY()==0)//Y
+    {
+        packet2[0] |= Y_MASK_ON;
+    }else{
+        packet2[0] &= Y_MASK_OFF;
+    }
+    if(DNKEY()==0)//A
+    {
+        packet2[0] |= A_MASK_ON;
+    }else{
+        packet2[0] &= A_MASK_OFF;
+    }
+
+    if(LFKEY()==0)
+    {
+        packet2[0] |= X_MASK_ON;
+    } else {
+        packet2[0] &= X_MASK_OFF;
+    }
+    if(RGKEY()==0)
+    {
+        packet2[0] |= B_MASK_ON;
+    } else {
+        packet2[0] &= B_MASK_OFF;
+    }
+
+    if(BKKEY()==0)//BUTTON_BACK
+    {
+        packet1[0] |= BACK_MASK_ON;
+    } else {
+        packet1[0] &= BACK_MASK_OFF;
+    }
+    if(MDKEY()==0)//BUTTON_LB
+    {
+        packet2[0] |= LB_MASK_ON;
+    } else {
+        packet2[0] &= LB_MASK_OFF;
+    }
+    if(STKEY()==0)//BUTTON_START
+    {
+        packet1[0] |= START_MASK_ON;
+    } else {
+        packet1[0] &= START_MASK_OFF;
+    }
+    if(TBKEY()==0)//BUTTON_RB
+    {
+        packet2[0] |= RB_MASK_ON;
+    } else {
+        packet2[0] &= RB_MASK_OFF;
+    }
+    if(SW1()!=0)
+    {
+        packet2[0] |= LOGO_MASK_ON;
+    } else {
+        packet2[0] &= LOGO_MASK_OFF;
+    }
 }
-```
+u8 buttonSemaphore = 0;
+u8 packet1=0,packet2=0;
+void ButtonTimer1Callback(MultiTimer* timer, void *userData) {
+    printf("Button_scan\r\n");
+    if (buttonSemaphore == 0) {
+        buttonHandler(&packet1,&packet2);
+        buttonSemaphore = 1;
+    }
 
-**4. 解析摇杆电位器和按键数据。**
+    MultiTimerStart(timer, 5, ButtonTimer1Callback, userData);
+}
+u8 adcSemaphore = 0;
+int16_t xtemp = 0, ytemp = 0;
+u16 adxsum=0,adysum=0,adcount=0;
+void ADCTimer2Callback(MultiTimer* timer, void *userData) {
+    printf("ADC Sample\r\n");
 
-```c
-void Xinput_Handle(void)
-{
-	int16_t X=0,Y=0;
-    //X-Y
-    for(u8 i=0; i<AD_DATA_SIZE;)
-    {
-        AdXSum += AD_DATA[i];
-        i++;
-        AdYSum += AD_DATA[i];
-        i++;
+    if (adcSemaphore == 0) {
+
+        adysum+=Get_Adc(1);
+        adxsum+=Get_Adc(2);
+
+        if(++adcount==10)
+        {
+            printf("x=%d,y=%d\r\n",adysum/adcount,adxsum/adcount);
+
+            xtemp=(int16_t)map( adxsum/adcount, AD_XMIN, AD_XMAX, INT16_MIN, INT16_MAX );
+            ytemp=(int16_t)map( adysum/adcount, AD_YMIN, AD_YMAX, INT16_MAX, INT16_MIN );
+
+            adysum=0;
+            adxsum=0;
+            adcount=0;
+            adcSemaphore = 1;
+        }
+
+
     }
-    Xtemp=AdXSum/10;
-    AdXSum=0;
-    Ytemp=AdYSum/10;
-    AdYSum=0;
-    if(Xtemp>Xmax)
-        Xtemp=Xmax;
-    if(Xtemp<Xmin)
-        Xtemp=Xmin;
-    if(Ytemp>Ymax)
-        Ytemp=Ymax;
-    if(Ytemp<Ymin)
-        Ytemp=Ymin;
-    X=(int16_t)map( Xtemp, Xmin, Xmax, INT16_MAX, INT16_MIN );
-    Y=(int16_t)map( Ytemp, Ymin, Ymax, INT16_MIN, INT16_MAX );
-	//Button
-    if((UPKEY)==0)//Y
+    MultiTimerStart(timer, 5, ADCTimer2Callback, userData);
+}
+
+
+void JoystickTimer3Callback(MultiTimer* timer, void *userData) {
+
+    printf("Mouse Report\r\n");
+    if( USBHD_DevEnumStatus )
     {
-        TXData[BUTTON_PACKET_2] |= Y_MASK_ON;
-    }else{
-		TXData[BUTTON_PACKET_2] &= Y_MASK_OFF;
-	}
-    if((DNKEY)==0)//A
-    {
-        TXData[BUTTON_PACKET_2] |= A_MASK_ON;
-    }else{
-		TXData[BUTTON_PACKET_2] &= A_MASK_OFF;		
-	}
-    if(LFKEY==0)
-    {
-        TXData[BUTTON_PACKET_2] |= X_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_2] &= X_MASK_OFF;
+
+        if(adcSemaphore)
+        {
+            adcSemaphore=0;
+
+            TXData[LEFT_STICK_X_PACKET_LSB] = LOBYTE(xtemp);        // (CONFERIR)
+            TXData[LEFT_STICK_X_PACKET_MSB] = HIBYTE(xtemp);
+            //Left Stick Y Axis
+            TXData[LEFT_STICK_Y_PACKET_LSB] = LOBYTE(ytemp);
+            TXData[LEFT_STICK_Y_PACKET_MSB] = HIBYTE(ytemp);
+        }
+        if(buttonSemaphore)
+        {
+            buttonSemaphore=0;
+            TXData[BUTTON_PACKET_2]=packet2;
+            TXData[BUTTON_PACKET_1]=packet1;
+
+        }
+        //Clear DPAD
+        TXData[BUTTON_PACKET_1] &= DPAD_MASK_OFF;
+
+        USBHD_Endp_DataUp( DEF_UEP1, TXData,sizeof(TXData), DEF_UEP_CPY_LOAD );
+
+
     }
-    if(RGKEY==0)
-    {
-        TXData[BUTTON_PACKET_2] |= B_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_2] &= B_MASK_OFF;
-    }
-	
-    if(BKKEY==0)//BUTTON_BACK
-    {
-        TXData[BUTTON_PACKET_1] |= BACK_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_1] &= BACK_MASK_OFF;
-    }
-    if(MDKEY==0)//BUTTON_LB
-    {
-        TXData[BUTTON_PACKET_2] |= LB_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_2] &= LB_MASK_OFF;
-    }
-    if(STKEY==0)//BUTTON_START
-    {
-        TXData[BUTTON_PACKET_1] |= START_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_1] &= START_MASK_OFF;
-    }	
-    if(TBKEY==0)//BUTTON_RB
-    {
-        TXData[BUTTON_PACKET_2] |= RB_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_2] &= RB_MASK_OFF;
-    }	
-    if(SW1!=0)
-    {
-        TXData[BUTTON_PACKET_2] |= LOGO_MASK_ON;
-    } else {
-        TXData[BUTTON_PACKET_2] &= LOGO_MASK_OFF;
-    }
-	TXData[LEFT_STICK_X_PACKET_LSB] = LOBYTE(Y);		// (CONFERIR)
-	TXData[LEFT_STICK_X_PACKET_MSB] = HIBYTE(Y);
-	//Left Stick Y Axis
-	TXData[LEFT_STICK_Y_PACKET_LSB] = LOBYTE(X);
-	TXData[LEFT_STICK_Y_PACKET_MSB] = HIBYTE(X);
-	//Clear DPAD
-	TXData[BUTTON_PACKET_1] &= DPAD_MASK_OFF;
-	USBD_CUSTOM_HID_SendReport(&hUsbDeviceFS,(u8*)&TXData, 20);
+    MultiTimerStart(timer, 5, JoystickTimer3Callback, userData);
 }
 ```
 
@@ -2524,7 +2187,7 @@ void Xinput_Handle(void)
 
 
 
-## 3.11 实例Eg11_Xinput
+## 3.11 实例Eg11_Xinput01
 
 本节目标还是实现Xbox 360 Controller for Windows.
 
@@ -2534,7 +2197,302 @@ void Xinput_Handle(void)
 
 ### 3.10.2 软件设计
 
-本节在上一节的基础上修改了ADC和按键部分，具体请自行查看代码和视频
+本节在上一节的基础上修改了ADC和按键部分，
+
+首先是ADC代码的配置
+
+```c
+// 初始化ADC
+// 这里我们仅以规则通道为例
+// 我们默认将开启通道0~3
+void Adc_Init(void) {
+    ADC_InitTypeDef ADC_InitStructure;
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+    // 使能ADC1通道时钟和GPIOA时钟
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_ADC1, ENABLE);
+
+    RCC_ADCCLKConfig(RCC_PCLK2_Div6);   // 设置ADC分频因子6，将PCLK2分频为12MHz
+
+    // 配置PA1和PA2作为模拟通道输入引脚
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_4
+            | GPIO_Pin_5;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;  // 模拟输入引脚
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    ADC_DeInit(ADC1);  // 复位ADC1
+
+    // 配置ADC1的工作模式
+    ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;       // ADC1和ADC2工作在独立模式
+    ADC_InitStructure.ADC_ScanConvMode = DISABLE;              // 模数转换工作在单通道模式
+    ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;        // 模数转换工作在单次转换模式
+    ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None; // 转换由软件而不是外部触发启动
+    ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;     // ADC数据右对齐
+    ADC_InitStructure.ADC_NbrOfChannel = 1;                 // 顺序进行规则转换的ADC通道的数目
+    ADC_Init(ADC1, &ADC_InitStructure);  // 根据ADC_InitStruct中指定的参数初始化外设ADC1的寄存器
+
+    ADC_Cmd(ADC1, ENABLE);  // 使能指定的ADC1
+
+    ADC_ResetCalibration(ADC1);  // 使能复位校准
+
+    while (ADC_GetResetCalibrationStatus(ADC1));
+    // 等待复位校准结束
+
+    ADC_StartCalibration(ADC1);  // 开启AD校准
+
+    while (ADC_GetCalibrationStatus(ADC1));
+    // 等待校准结束
+
+    // ADC_SoftwareStartConvCmd(ADC1, ENABLE);  // 使能指定的ADC1的软件转换启动功能
+}
+
+// 获得ADC值
+// ch:通道值 0~3
+u16 Get_Adc(u8 ch) {
+    // 设置指定ADC的规则组通道，一个序列，采样时间
+    ADC_RegularChannelConfig(ADC1, ch, 1, ADC_SampleTime_239Cycles5); // ADC1,ADC通道,采样时间为239.5周期
+
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE);  // 使能指定的ADC1的软件转换启动功能
+
+    while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
+    // 等待转换结束
+
+    return ADC_GetConversionValue(ADC1);  // 返回最近一次ADC1规则组的转换结果
+}
+
+/*  Re-maps a number from one range to another
+ *
+ */
+int32_t map(int32_t x, int32_t in_min, int32_t in_max, int32_t out_min,
+        int32_t out_max) {
+    if (x > in_max) {
+        return out_max;
+    } else if (x < in_min) {
+        return out_min;
+    } else {
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    }
+
+}
+
+
+
+```
+
+接着是按键代码
+
+```c
+#include "Button.h"
+/*********************************************************************
+ * @fn      buttonGPIOInit
+ *
+ * @brief   按键IO初始化
+ *
+ * @param   none
+ *
+ * @return  none
+ */
+void buttonGPIOInit(void)
+{
+    GPIO_InitTypeDef  GPIO_InitStructure;
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE); // 使能GPIOA时钟
+
+    // 配置GPIOA的Pin 0为输入下拉模式（IPD）
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_3;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    // 配置GPIOA的Pin 15为输入上拉模式（IPU）
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE); // 使能GPIOB时钟
+
+    // 配置GPIOB的Pin 3, 4, 5, 6, 7, 8, 9为输入上拉模式（IPU）
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_6
+                                | GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+}
+
+
+
+void buttonHandler(u8* packet1,u8* packet2)
+{
+
+    //Button
+    if(UPKEY()==0)//Y
+    {
+        packet2[0] |= Y_MASK_ON;
+    }else{
+        packet2[0] &= Y_MASK_OFF;
+    }
+    if(DNKEY()==0)//A
+    {
+        packet2[0] |= A_MASK_ON;
+    }else{
+        packet2[0] &= A_MASK_OFF;
+    }
+
+    if(LFKEY()==0)
+    {
+        packet2[0] |= X_MASK_ON;
+    } else {
+        packet2[0] &= X_MASK_OFF;
+    }
+    if(RGKEY()==0)
+    {
+        packet2[0] |= B_MASK_ON;
+    } else {
+        packet2[0] &= B_MASK_OFF;
+    }
+
+    if(BKKEY()==0)//BUTTON_BACK
+    {
+        packet1[0] |= BACK_MASK_ON;
+    } else {
+        packet1[0] &= BACK_MASK_OFF;
+    }
+    if(MDKEY()==0)//BUTTON_LB
+    {
+        packet2[0] |= LB_MASK_ON;
+    } else {
+        packet2[0] &= LB_MASK_OFF;
+    }
+    if(STKEY()==0)//BUTTON_START
+    {
+        packet1[0] |= START_MASK_ON;
+    } else {
+        packet1[0] &= START_MASK_OFF;
+    }
+    if(TBKEY()==0)//BUTTON_RB
+    {
+        packet2[0] |= RB_MASK_ON;
+    } else {
+        packet2[0] &= RB_MASK_OFF;
+    }
+    if(SW1()!=0)
+    {
+        packet2[0] |= LOGO_MASK_ON;
+    } else {
+        packet2[0] &= LOGO_MASK_OFF;
+    }
+    if(SW1()==0)//
+    {
+        packet1[0] &= L3_MASK_OFF;
+    }
+    else
+    {
+        packet1[0] |= L3_MASK_ON;
+    }
+    if(SW2()==0)//
+    {
+        packet1[0] |= R3_MASK_ON;
+    }
+    else
+    {
+        packet1[0] &= R3_MASK_OFF;
+    }
+}
+
+
+
+```
+
+3. 数据解析
+
+   ```c
+   u8 buttonSemaphore = 0;
+   u8 packet1=0,packet2=0;
+   void ButtonTimer1Callback(MultiTimer* timer, void *userData) {
+       printf("Button_scan\r\n");
+       if (buttonSemaphore == 0) {
+           buttonHandler(&packet1,&packet2);
+           buttonSemaphore = 1;
+       }
+   
+       MultiTimerStart(timer, 5, ButtonTimer1Callback, userData);
+   }
+   u8 adcSemaphore = 0;
+   int16_t xtemp = 0, ytemp = 0,Rxtemp=0,Rytemp=0;
+   u16 adxsum=0,adysum=0,adRxsum=0,adRysum=0;
+   u8 adcount=0;
+   void ADCTimer2Callback(MultiTimer* timer, void *userData) {
+       printf("ADC Sample\r\n");
+   
+       if (adcSemaphore == 0) {
+   
+           adysum+=Get_Adc(1);
+           adxsum+=Get_Adc(2);
+           adRxsum+=Get_Adc(4);
+           adRysum+=Get_Adc(5);
+   
+           if(++adcount==10)
+           {
+               printf("x=%d,y=%d\r\n",adysum/adcount,adxsum/adcount);
+   
+               xtemp=(int16_t)map( adxsum/adcount, AD_XMIN, AD_XMAX, INT16_MIN, INT16_MAX );
+               ytemp=(int16_t)map( adysum/adcount, AD_YMIN, AD_YMAX, INT16_MAX, INT16_MIN );
+               Rxtemp=(int16_t)map( adRxsum/adcount, AD_YMIN, AD_YMAX, INT16_MAX, INT16_MIN );
+               Rytemp=(int16_t)map( adRysum/adcount, AD_YMIN, AD_YMAX, INT16_MAX, INT16_MIN );
+               adysum=0;
+               adxsum=0;
+               adRxsum=0;
+               adRysum=0;
+               adcount=0;
+               adcSemaphore = 1;
+           }
+   
+   
+       }
+       MultiTimerStart(timer, 5, ADCTimer2Callback, userData);
+   }
+   
+   
+   void JoystickTimer3Callback(MultiTimer* timer, void *userData) {
+   
+       printf("Mouse Report\r\n");
+       if( USBHD_DevEnumStatus )
+       {
+   
+           if(adcSemaphore)
+           {
+               adcSemaphore=0;
+   
+               TXData[LEFT_STICK_X_PACKET_LSB] = LOBYTE(xtemp);        // (CONFERIR)
+               TXData[LEFT_STICK_X_PACKET_MSB] = HIBYTE(xtemp);
+   
+               TXData[LEFT_STICK_Y_PACKET_LSB] = LOBYTE(ytemp);
+               TXData[LEFT_STICK_Y_PACKET_MSB] = HIBYTE(ytemp);
+   
+               TXData[RIGHT_STICK_X_PACKET_LSB] = LOBYTE(Rxtemp);      // (CONFERIR)
+               TXData[RIGHT_STICK_X_PACKET_MSB] = HIBYTE(Rxtemp);
+   
+               TXData[RIGHT_STICK_Y_PACKET_LSB] = LOBYTE(Rytemp);
+               TXData[RIGHT_STICK_Y_PACKET_MSB] = HIBYTE(Rytemp);
+   
+           }
+           if(buttonSemaphore)
+           {
+               buttonSemaphore=0;
+               TXData[BUTTON_PACKET_2]=packet2;
+               TXData[BUTTON_PACKET_1]=packet1;
+   
+           }
+           //Clear DPAD
+           TXData[BUTTON_PACKET_1] &= DPAD_MASK_OFF;
+   
+           USBHD_Endp_DataUp( DEF_UEP1, TXData,20, DEF_UEP_CPY_LOAD );
+   
+   
+       }
+       MultiTimerStart(timer, 5, JoystickTimer3Callback, userData);
+   }
+   
+   ```
+
+   
 
 ### 3.10.3 下载验证
 
@@ -2544,18 +2502,116 @@ void Xinput_Handle(void)
 
 
 
-## 3.12 实例Eg12_Xinput
+## 3.12 实例Eg12_MultiAxisButton
 
-本节目标还是实现Xbox 360 Controller for Windows.
+本节目标是实现多轴多按键摇杆
 
-### 3.10.1硬件设计
+### 3.12.1硬件设计
 
-参考原理图； H2外拓摇杆
+参考原理图； 
 
-### 3.10.2 软件设计
+### 3.12.2 软件设计
 
-本节在上一节的基础上修改了ADC和按键部分，具体请自行查看代码和视频
+1. 准备摇杆报表，
 
-### 3.10.3 下载验证
+```c
+/* JoystickRepDesc Report Descriptor */
+const uint8_t JoystickRepDesc[ ] =
+{
+        0x05, 0x01,                                  // Usage Page (Generic Desktop)
+        0x09, 0x04,                                  // Usage (Joystick)
+        0xA1, 0x01,                                  // Collection (Application)
+        0x05, 0x01,                                  // Usage Page (Generic Desktop)
+        0x09, 0x01,                                  // Usage (Pointer)
+        0xA1, 0x02,                                  // Collection (Logical)
+        0x09, 0x30,                                  // Usage (X)
+        0x09, 0x31,                                  // Usage (Y)
+        0x09, 0x32,                                  // Usage (Z)
+        0x09, 0x33,                                  // Usage (Rx)
+        0x09, 0x34,                                  // Usage (Ry)
+        0x09, 0x35,                                  // Usage (Rz)
+        0x09, 0x36,                                  // Usage (Slider)
+        0x09, 0x37,                                  // Usage (Dial)
+        0x15, 0x00,                                  // Logical Minimum (0)
+        0x26, 0xFF, 0x03,                            // Logical Maximum (1023)
+        0x75, 0x10,                                  // Report Size (16)
+        0x95, 0x08,                                  // Report Count (8)
+        0x81, 0x02,                                  // Input (Data,Variable,Absolute)
+        0x05, 0x09,                                  // Usage Page (Button)
+        0x19, 0x01,                                  // Usage Minimum (Button 1)
+        0x29, 0x20,                                  // Usage Minimum (Button 32)
+        0x15, 0x00,                                  // Logical Minimum (0)
+        0x25, 0x01,                                  // Logical Maximum (1)
+        0x75, 0x01,                                  // Report Size (1)
+        0x95, 0x20,                                  // Report Count (32)
+        0x81, 0x02,                                  // Input (Data,Variable,Absolute)
+        0xC0,                                        // End Collection
+        0xA1, 0x02,                                  // Collection (Logical)
+        0x95, 0x07,                                  // Report Count (7)
+        0x75, 0x08,                                  // Report Size (8)
+        0x09, 0x01,                                  // Usage (Button 1)
+        0x91, 0x02,                                  // Output (Data,Variable,Absolute)
+        0xC0,                                        // End Collection
+        0xc0                          // END_COLLECTION                                               // End Collection
+};
+```
 
-我们把固件程序下载进去，Xbox 360 Controller for Windows出现在电脑上。
+2. 最后解析数据。
+
+```c
+void JoystickTimer3Callback(MultiTimer* timer, void *userData) {
+    printf("Joystick Report\r\n");
+    if( USBHD_DevEnumStatus )
+    {
+        if(adcSemaphore)
+        {
+            adcSemaphore=0;
+
+            Joystick_Report[0]=ytemp;
+            Joystick_Report[1]=ytemp>>8;
+            Joystick_Report[2]=xtemp;
+            Joystick_Report[3]=xtemp>>8;
+            Joystick_Report[4]=ytemp;
+            Joystick_Report[5]=ytemp>>8;
+            Joystick_Report[6]=xtemp;
+            Joystick_Report[7]=xtemp>>8;
+            Joystick_Report[8]=ytemp;
+            Joystick_Report[9]=ytemp>>8;
+            Joystick_Report[10]=xtemp;
+            Joystick_Report[11]=xtemp>>8;
+            Joystick_Report[12]=ytemp;
+            Joystick_Report[13]=ytemp>>8;
+            Joystick_Report[14]=xtemp;
+            Joystick_Report[15]=xtemp>>8;
+
+        }
+        if(buttonSemaphore)
+        {
+            buttonSemaphore=0;
+
+            Joystick_Report[16]=button;
+            Joystick_Report[17]=button;
+            Joystick_Report[18]=button;
+            Joystick_Report[19]=button;
+        }
+
+        if(memcmp(LastJoystick_Report,Joystick_Report,
+                        sizeof(Joystick_Report) / sizeof(Joystick_Report[0]))!=0)
+        {
+            USBHD_Endp_DataUp( DEF_UEP1, Joystick_Report,
+                    sizeof(Joystick_Report) / sizeof(Joystick_Report[0]), DEF_UEP_CPY_LOAD );
+        }
+
+        memcpy(LastJoystick_Report,Joystick_Report,
+                sizeof(Joystick_Report) / sizeof(Joystick_Report[0]));
+
+    }
+    MultiTimerStart(timer, 5, JoystickTimer3Callback, userData);
+}
+```
+
+
+
+### 3.12.3 下载验证
+
+我们把固件程序下载进去出现多轴多按键。
