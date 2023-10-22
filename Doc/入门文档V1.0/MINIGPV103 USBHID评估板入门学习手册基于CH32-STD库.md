@@ -3,6 +3,23 @@
 
 由于作者水平有限，文档和视频中难免有出错和讲得不好的地方，欢迎各位读者和观众善意地提出意见和建议，谢谢！
 
+
+
+| **实例**             | **描述**                             |
+| -------------------- | ------------------------------------ |
+| Eg1_Joystick         | 实现一个Joystick摇杆设备             |
+| Eg2_WS2812B          | 点亮WS2812B灯珠并实现七彩渐变        |
+| Eg3_MultiTimer       | 移植MultiTimer软件定时器模块         |
+| Eg4_Mouse            | 实现模拟鼠标功能                     |
+| Eg5_KeyBoard         | 实现模拟键盘功能                     |
+| Eg6_DoubleJoystick   | 实现一个USB双摇杆                    |
+| Eg7_CompositeGMK     | 实现Joystick、MOUSE、Keyboard的组合  |
+| Eg8_Gamepad          | 实现游戏手柄Gamepad的功能            |
+| Eg9_AbsoluteMouse    | 实现绝对值鼠标的功能                 |
+| Eg10_Xinput          | 实现Xbox手柄功能，Xinput（出厂默认） |
+| Eg11_Xinput01        | 外接摇杆电位器实现Xbox手柄功能       |
+| Eg12_MultiAxisButton | 实现8轴32键摇杆                      |
+
 # 第一部分、硬件概述
 
 ## 1.1 实物概图
